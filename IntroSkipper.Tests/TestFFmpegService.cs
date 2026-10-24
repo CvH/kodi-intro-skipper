@@ -419,6 +419,28 @@ public class TestFFmpegService
         Assert.True(capture.Stderr.Length <= 10_000);
     }
 
+    [Theory]
+    [InlineData("00:50:44.672000000", 3044.672)]
+    [InlineData("3044.672000", 3044.672)]
+    [InlineData("00:41:33.408000000", 2493.408)]
+    [InlineData("01:00:00", 3600.0)]
+    public void TryParseDuration_ValidInputs_ReturnsParsedSeconds(string input, double expectedSeconds)
+    {
+        Assert.True(FFmpegService.TryParseDuration(input, out var seconds));
+        Assert.Equal(expectedSeconds, seconds, precision: 3);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("N/A")]
+    [InlineData("-1.0")]
+    [InlineData("not-a-number")]
+    public void TryParseDuration_InvalidInputs_ReturnsFalse(string input)
+    {
+        Assert.False(FFmpegService.TryParseDuration(input, out _));
+    }
+
     private static FFmpegService CreateFFmpegService(Func<CancellationToken, Task<bool>>? versionProbe = null, TimeSpan? versionProbeTimeout = null)
         => FfmpegTestHelpers.CreateFFmpegService(versionProbe, versionProbeTimeout);
 }

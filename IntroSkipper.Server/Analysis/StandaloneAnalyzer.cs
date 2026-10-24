@@ -201,34 +201,33 @@ public sealed class StandaloneAnalyzer(
         Guid episodeId,
         CancellationToken cancellationToken)
     {
+        var duration = 0.0;
+        try
+        {
+            var audioDuration = await _ffmpegService.ProbeAudioDurationAsync(filePath, cancellationToken).ConfigureAwait(false);
+            if (audioDuration.HasValue && audioDuration.Value > 0)
+            {
+                duration = audioDuration.Value;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to probe duration for {File}", filePath);
+        }
+
         var tempEpisode = new QueuedEpisode
         {
             EpisodeId = episodeId,
             Path = filePath,
+            Duration = duration,
         };
 
         var chapters = await _ffmpegService.GetEmbeddedChaptersAsync(tempEpisode, cancellationToken).ConfigureAwait(false) ?? [];
-        var duration = 0.0;
-        if (chapters.Length > 0)
+
+        // Fallback only if duration probe completely failed but chapters are present
+        if (duration <= 0 && chapters.Length > 0)
         {
             duration = TimeSpan.FromTicks(chapters[^1].StartPositionTicks).TotalSeconds;
-        }
-
-        // If chapters duration is unavailable, probe audio duration with ffprobe
-        if (duration <= 0)
-        {
-            try
-            {
-                var audioDuration = await _ffmpegService.ProbeAudioDurationAsync(filePath, cancellationToken).ConfigureAwait(false);
-                if (audioDuration.HasValue && audioDuration.Value > 0)
-                {
-                    duration = audioDuration.Value;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Failed to probe duration for {File}", filePath);
-            }
         }
 
         return (duration, chapters);

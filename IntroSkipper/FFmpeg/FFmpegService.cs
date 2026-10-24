@@ -631,7 +631,7 @@ internal sealed partial class FFmpegService : IFFmpegService
             [
                 "-v", "error",
                 "-select_streams", "a:0",
-                "-show_entries", "stream=duration:stream_tags=DURATION",
+                "-show_entries", "stream=duration:stream_tags=DURATION:format=duration",
                 "-of", "csv=p=0",
                 filePath,
             ];
@@ -642,21 +642,14 @@ internal sealed partial class FFmpegService : IFFmpegService
                 return null;
             }
 
-            foreach (var value in output.Split('\n')[0].Split(',').Select(static f => f.Trim()))
+            foreach (var line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
             {
-                if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "N/A", StringComparison.OrdinalIgnoreCase))
+                foreach (var value in line.Split(',').Select(static f => f.Trim()))
                 {
-                    continue;
-                }
-
-                if (double.TryParse(value, CultureInfo.InvariantCulture, out var seconds) && seconds > 0)
-                {
-                    return seconds;
-                }
-
-                if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var duration) && duration.TotalSeconds > 0)
-                {
-                    return duration.TotalSeconds;
+                    if (TryParseDuration(value, out var duration) && duration > 0)
+                    {
+                        return duration;
+                    }
                 }
             }
         }
@@ -666,6 +659,46 @@ internal sealed partial class FFmpegService : IFFmpegService
         }
 
         return null;
+    }
+
+    internal static bool TryParseDuration(string value, out double duration)
+    {
+        duration = 0;
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "N/A", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (double.TryParse(value, CultureInfo.InvariantCulture, out var seconds) && seconds > 0)
+        {
+            duration = seconds;
+            return true;
+        }
+
+        // Matroska DURATION tags frequently have 9 fractional digits (e.g. 00:50:44.672000000).
+        // Standard .NET TimeSpan.TryParse only supports up to 7 fractional digits (100-nanosecond ticks).
+        var dotIndex = value.IndexOf('.', StringComparison.Ordinal);
+        var timeSpanCandidate = dotIndex > 0 && value.Length - dotIndex > 8
+            ? value[..(dotIndex + 8)]
+            : value;
+
+        if (TimeSpan.TryParse(timeSpanCandidate, CultureInfo.InvariantCulture, out var ts) && ts.TotalSeconds > 0)
+        {
+            duration = ts.TotalSeconds;
+            return true;
+        }
+
+        var parts = value.Split(':');
+        if (parts.Length == 3 &&
+            double.TryParse(parts[0], CultureInfo.InvariantCulture, out var h) &&
+            double.TryParse(parts[1], CultureInfo.InvariantCulture, out var m) &&
+            double.TryParse(parts[2], CultureInfo.InvariantCulture, out var s))
+        {
+            duration = (h * 3600) + (m * 60) + s;
+            return duration > 0;
+        }
+
+        return false;
     }
 
     /// <inheritdoc />
