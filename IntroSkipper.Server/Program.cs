@@ -98,6 +98,20 @@ using (var scope = app.Services.CreateScope())
 {
     var storage = scope.ServiceProvider.GetRequiredService<ServerStorage>();
     await storage.InitializeAsync().ConfigureAwait(false);
+
+    try
+    {
+        var configStore = scope.ServiceProvider.GetRequiredService<ServerConfigStore>();
+        var discovered = await kodiBridge.DiscoverKodiSourcesAsync().ConfigureAwait(false);
+        if (discovered.Count > 0)
+        {
+            configStore.SyncScanSources(discovered);
+        }
+    }
+    catch
+    {
+        // Ignore if Kodi is offline during initial startup
+    }
 }
 
 // Health check
@@ -400,8 +414,26 @@ app.MapPost("/api/config", (
 app.MapPost("/api/config/reset", (ServerConfigStore configStore) => Results.Ok(configStore.Reset()));
 
 // Media scan source management endpoints
-app.MapGet("/api/sources", (ServerConfigStore configStore) =>
-    Results.Ok(configStore.GetScanSources()));
+app.MapGet("/api/sources", async (
+    ServerConfigStore configStore,
+    KodiVfsBridge kodiBridge,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var discovered = await kodiBridge.DiscoverKodiSourcesAsync(cancellationToken).ConfigureAwait(false);
+        if (discovered.Count > 0)
+        {
+            configStore.SyncScanSources(discovered);
+        }
+    }
+    catch
+    {
+        // Proceed with stored sources if Kodi is offline
+    }
+
+    return Results.Ok(configStore.GetScanSources());
+});
 
 app.MapPost("/api/sources", (
     [FromBody] ScanSourceRequest request,
@@ -422,7 +454,7 @@ app.MapPost("/api/sources/sync", (
 {
     var incoming = (request?.Sources ?? [])
         .Where(s => !string.IsNullOrWhiteSpace(s.Path))
-        .Select(s => new ScanSource(s.Name ?? string.Empty, s.Path, s.Enabled ?? true, s.ContentType ?? "tvshows"));
+        .Select(s => new ScanSource(s.Name ?? string.Empty, s.Path, s.Enabled ?? false, s.ContentType ?? "tvshows", IsKodiSource: true));
 
     var synced = configStore.SyncScanSources(incoming);
     return Results.Ok(synced);
@@ -435,6 +467,12 @@ app.MapDelete("/api/sources", (
     if (string.IsNullOrWhiteSpace(path))
     {
         return Results.BadRequest(new { error = "Path query parameter is required." });
+    }
+
+    var existing = configStore.GetScanSources().FirstOrDefault(s => string.Equals(s.Path, path, StringComparison.OrdinalIgnoreCase));
+    if (existing?.IsKodiSource == true)
+    {
+        return Results.BadRequest(new { error = "Kodi sources cannot be deleted from the server, only disabled." });
     }
 
     var removed = configStore.RemoveScanSource(path);

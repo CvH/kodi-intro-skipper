@@ -5,7 +5,9 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
+using IntroSkipper.Data;
 using IntroSkipper.Server.Scanning;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -378,6 +380,297 @@ public sealed class KodiVfsBridge : IDisposable
         }
 
         return (8080, null, null);
+    }
+
+    /// <summary>
+    /// Discovers all video media sources configured in Kodi, extracting friendly names,
+    /// file/share paths, and content types (e.g. tvshows, movies, unset).
+    /// Discovered sources default to disabled (<c>Enabled = false</c>) and <c>IsKodiSource = true</c>.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of discovered Kodi media sources.</returns>
+    public async Task<IReadOnlyList<ScanSource>> DiscoverKodiSourcesAsync(CancellationToken cancellationToken = default)
+    {
+        var rawSources = new List<(string Name, string Path)>();
+
+        // 1. Try querying Kodi JSON-RPC Files.GetSources
+        var payload = new
+        {
+            jsonrpc = "2.0",
+            method = "Files.GetSources",
+            params_ = new { media = "video" },
+            id = 1,
+        };
+        var jsonText = JsonSerializer.Serialize(payload).Replace("\"params_\":", "\"params\":");
+        try
+        {
+            using var response = await SendJsonRpcStringAsync(jsonText, cancellationToken).ConfigureAwait(false);
+            if (response is not null &&
+                response.RootElement.TryGetProperty("result", out var result) &&
+                result.TryGetProperty("sources", out var sourcesElem))
+            {
+                foreach (var item in sourcesElem.EnumerateArray())
+                {
+                    var file = item.TryGetProperty("file", out var f) ? f.GetString() : null;
+                    var label = item.TryGetProperty("label", out var l) ? l.GetString() : null;
+                    if (!string.IsNullOrWhiteSpace(file))
+                    {
+                        if (file.StartsWith("addons://", StringComparison.OrdinalIgnoreCase) ||
+                            file.StartsWith("library://", StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        rawSources.Add((label ?? Path.GetFileName(file.TrimEnd('/', '\\')), file));
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to query Kodi JSON-RPC Files.GetSources");
+        }
+
+        // 2. If JSON-RPC was not reachable or returned no sources, parse sources.xml
+        if (rawSources.Count == 0)
+        {
+            var sourcesXml = FindSourcesXml();
+            if (sourcesXml is not null && File.Exists(sourcesXml))
+            {
+                try
+                {
+                    var doc = XDocument.Load(sourcesXml);
+                    var videoElem = doc.Root?.Element("video");
+                    if (videoElem is not null)
+                    {
+                        foreach (var src in videoElem.Elements("source"))
+                        {
+                            var name = (string?)src.Element("name") ?? "Kodi Source";
+                            foreach (var p in src.Elements("path"))
+                            {
+                                var path = ((string?)p)?.Trim();
+                                if (!string.IsNullOrWhiteSpace(path) &&
+                                    !path.StartsWith("addons://", StringComparison.OrdinalIgnoreCase) &&
+                                    !path.StartsWith("library://", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    rawSources.Add((name, path));
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to parse sources.xml from {Path}", sourcesXml);
+                }
+            }
+        }
+
+        if (rawSources.Count == 0)
+        {
+            return [];
+        }
+
+        // 3. Resolve Content Types (tvshows, movies, unset)
+        var contentMap = TryLoadKodiDatabaseContentMap();
+        var showPaths = new List<string>();
+        var moviePaths = new List<string>();
+
+        if (contentMap.Count == 0)
+        {
+            await TryPopulateLibraryPathsFromJsonRpcAsync(showPaths, moviePaths, cancellationToken).ConfigureAwait(false);
+        }
+
+        var results = new List<ScanSource>();
+        foreach (var (name, path) in rawSources)
+        {
+            var contentType = ResolveContentType(path, name, contentMap, showPaths, moviePaths);
+            results.Add(new ScanSource(name, path, Enabled: false, ContentType: contentType, IsKodiSource: true));
+        }
+
+        _logger.LogInformation("Discovered {Count} media sources from Kodi (default disabled)", results.Count);
+        return results;
+    }
+
+    private Dictionary<string, string> TryLoadKodiDatabaseContentMap()
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var dbFile = FindLatestKodiVideoDatabase();
+        if (dbFile is null || !File.Exists(dbFile))
+        {
+            return map;
+        }
+
+        try
+        {
+            var connStr = new SqliteConnectionStringBuilder
+            {
+                DataSource = dbFile,
+                Mode = SqliteOpenMode.ReadOnly,
+            }.ToString();
+
+            using var conn = new SqliteConnection(connStr);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT strPath, strContent FROM path WHERE strContent IS NOT NULL AND strContent != ''";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var p = reader.GetString(0);
+                var c = reader.GetString(1);
+                if (!string.IsNullOrWhiteSpace(p))
+                {
+                    map[p] = c;
+                    map[p.TrimEnd('/', '\\')] = c;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to read content types from Kodi video database {Db}", dbFile);
+        }
+
+        return map;
+    }
+
+    private static string? FindLatestKodiVideoDatabase()
+    {
+        var candidates = new[]
+        {
+            "/storage/.kodi/userdata/Database",
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".kodi", "userdata", "Database"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kodi", "userdata", "Database"),
+        };
+
+        foreach (var dir in candidates)
+        {
+            if (Directory.Exists(dir))
+            {
+                var files = Directory.GetFiles(dir, "MyVideos*.db");
+                if (files.Length > 0)
+                {
+                    return files.OrderByDescending(f => f).First();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string? FindSourcesXml()
+    {
+        var candidates = new[]
+        {
+            "/storage/.kodi/userdata/sources.xml",
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".kodi", "userdata", "sources.xml"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kodi", "userdata", "sources.xml"),
+        };
+
+        return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private async Task TryPopulateLibraryPathsFromJsonRpcAsync(
+        List<string> showPaths,
+        List<string> moviePaths,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tvPayload = new
+            {
+                jsonrpc = "2.0",
+                method = "VideoLibrary.GetTVShows",
+                params_ = new { properties = new[] { "file" } },
+                id = 1,
+            };
+            var tvJson = JsonSerializer.Serialize(tvPayload).Replace("\"params_\":", "\"params\":");
+            using var tvResp = await SendJsonRpcStringAsync(tvJson, cancellationToken).ConfigureAwait(false);
+            if (tvResp is not null &&
+                tvResp.RootElement.TryGetProperty("result", out var tvRes) &&
+                tvRes.TryGetProperty("tvshows", out var tvshows))
+            {
+                foreach (var show in tvshows.EnumerateArray())
+                {
+                    if (show.TryGetProperty("file", out var f) && f.GetString() is string file && !string.IsNullOrWhiteSpace(file))
+                    {
+                        showPaths.Add(file);
+                    }
+                }
+            }
+
+            var moviePayload = new
+            {
+                jsonrpc = "2.0",
+                method = "VideoLibrary.GetMovies",
+                params_ = new { properties = new[] { "file" } },
+                id = 2,
+            };
+            var movieJson = JsonSerializer.Serialize(moviePayload).Replace("\"params_\":", "\"params\":");
+            using var movieResp = await SendJsonRpcStringAsync(movieJson, cancellationToken).ConfigureAwait(false);
+            if (movieResp is not null &&
+                movieResp.RootElement.TryGetProperty("result", out var mRes) &&
+                mRes.TryGetProperty("movies", out var movies))
+            {
+                foreach (var movie in movies.EnumerateArray())
+                {
+                    if (movie.TryGetProperty("file", out var f) && f.GetString() is string file && !string.IsNullOrWhiteSpace(file))
+                    {
+                        moviePaths.Add(file);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to query VideoLibrary from Kodi JSON-RPC");
+        }
+    }
+
+    private static string ResolveContentType(
+        string path,
+        string name,
+        Dictionary<string, string> contentMap,
+        List<string> showPaths,
+        List<string> moviePaths)
+    {
+        var norm = path.TrimEnd('/', '\\');
+
+        if (contentMap.TryGetValue(path, out var direct) || contentMap.TryGetValue(norm, out direct))
+        {
+            return direct;
+        }
+
+        foreach (var (k, v) in contentMap)
+        {
+            if (k.StartsWith(norm, StringComparison.OrdinalIgnoreCase) ||
+                norm.StartsWith(k.TrimEnd('/', '\\'), StringComparison.OrdinalIgnoreCase))
+            {
+                return v;
+            }
+        }
+
+        if (showPaths.Any(p => p.StartsWith(norm, StringComparison.OrdinalIgnoreCase) || norm.StartsWith(p.TrimEnd('/', '\\'), StringComparison.OrdinalIgnoreCase)))
+        {
+            return "tvshows";
+        }
+
+        if (moviePaths.Any(p => p.StartsWith(norm, StringComparison.OrdinalIgnoreCase) || norm.StartsWith(p.TrimEnd('/', '\\'), StringComparison.OrdinalIgnoreCase)))
+        {
+            return "movies";
+        }
+
+        var lower = $"{name} {norm}".ToLowerInvariant();
+        if (lower.Contains("tv") || lower.Contains("serie") || lower.Contains("show") || lower.Contains("anime"))
+        {
+            return "tvshows";
+        }
+
+        if (lower.Contains("film") || lower.Contains("movie"))
+        {
+            return "movies";
+        }
+
+        return "unset";
     }
 
     /// <inheritdoc/>

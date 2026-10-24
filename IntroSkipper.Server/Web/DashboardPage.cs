@@ -553,8 +553,10 @@ public static class DashboardPage
           <div>
             <div class="card-title">📂 Configured Media Sources</div>
             <div class="card-desc">Folders and network shares scanned for intro &amp; credit detection</div>
+          <div style="display: flex; gap: 8px;">
+            <button id="syncKodiSourcesBtn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 14px;" title="Fetch latest sources from Kodi">🔄 Sync from Kodi</button>
+            <button id="scanAllSourcesBtn" class="btn btn-primary" style="font-size: 0.85rem; padding: 6px 14px;">▶ Scan All Enabled</button>
           </div>
-          <button id="scanAllSourcesBtn" class="btn btn-primary" style="font-size: 0.85rem; padding: 6px 14px;">▶ Scan All Enabled</button>
         </div>
         
         <div id="sourcesList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
@@ -1777,6 +1779,7 @@ public static class DashboardPage
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                   <span style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(src.name || 'Media Source')}</span>
                   ${typeBadge}
+                  ${src.isKodiSource ? '<span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 9999px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">Kodi</span>' : ''}
                   <span style="font-size: 0.72rem; padding: 1px 7px; border-radius: 9999px; background: ${src.enabled ? 'rgba(16, 185, 129, 0.15); color: #34d399;' : 'rgba(156, 163, 175, 0.15); color: #9ca3af;'}">${src.enabled ? 'Enabled' : 'Disabled'}</span>
                 </div>
                 <span style="font-size: 0.82rem; color: var(--text-dim); word-break: break-all; font-family: monospace;">${escapeHtml(src.path)}</span>
@@ -1787,7 +1790,7 @@ public static class DashboardPage
                   <span class="slider"></span>
                 </label>
                 <button class="btn btn-secondary source-scan-btn" data-path="${escapeAttr(src.path)}" title="Scan this source" style="padding: 5px 9px; font-size: 0.8rem;">▶</button>
-                <button class="btn btn-danger source-del-btn" data-path="${escapeAttr(src.path)}" title="Remove source" style="padding: 5px 9px; font-size: 0.8rem;">🗑</button>
+                ${!src.isKodiSource ? `<button class="btn btn-danger source-del-btn" data-path="${escapeAttr(src.path)}" title="Remove source" style="padding: 5px 9px; font-size: 0.8rem;">🗑</button>` : ''}
               </div>
             </div>
           </div>
@@ -1883,6 +1886,23 @@ public static class DashboardPage
             showToast('Error: ' + e, false);
           }
         });
+      });
+    }
+
+    const syncKodiBtn = document.getElementById('syncKodiSourcesBtn');
+    if (syncKodiBtn) {
+      syncKodiBtn.addEventListener('click', async () => {
+        syncKodiBtn.disabled = true;
+        syncKodiBtn.textContent = '🔄 Syncing...';
+        try {
+          await loadSources();
+          showToast('Sources synced from Kodi');
+        } catch (e) {
+          showToast('Failed to sync sources: ' + e, false);
+        } finally {
+          syncKodiBtn.disabled = false;
+          syncKodiBtn.textContent = '🔄 Sync from Kodi';
+        }
       });
     }
 

@@ -188,9 +188,11 @@ public sealed class ServerConfigStore
                         var path = item.TryGetProperty("path", out var p) ? p.GetString() ?? string.Empty : string.Empty;
                         var enabled = item.TryGetProperty("enabled", out var e) && e.GetBoolean();
                         var contentType = item.TryGetProperty("contentType", out var c) ? c.GetString() ?? "tvshows" : "tvshows";
+                        var isKodi = (item.TryGetProperty("isKodiSource", out var ik) && ik.GetBoolean())
+                            || (item.TryGetProperty("isKodi", out var ik2) && ik2.GetBoolean());
                         if (!string.IsNullOrWhiteSpace(path))
                         {
-                            Current.ScanSources.Add(new ScanSource(name, path, enabled, contentType));
+                            Current.ScanSources.Add(new ScanSource(name, path, enabled, contentType, isKodi));
                         }
                     }
                 }
@@ -239,13 +241,15 @@ public sealed class ServerConfigStore
                 ? contentType
                 : (existing?.ContentType ?? "tvshows");
 
-            Current.ScanSources.Add(new ScanSource(friendlyName, path, enabled, resolvedContentType));
+            var isKodi = existing?.IsKodiSource ?? false;
+            Current.ScanSources.Add(new ScanSource(friendlyName, path, enabled, resolvedContentType, isKodi));
             Save();
         }
     }
 
     /// <summary>
     /// Removes a media scan source path by its path string.
+    /// Sources synced from Kodi cannot be removed (only disabled).
     /// </summary>
     /// <param name="path">Path to remove.</param>
     /// <returns>True if found and removed; otherwise false.</returns>
@@ -261,6 +265,11 @@ public sealed class ServerConfigStore
             var existing = Current.ScanSources.FirstOrDefault(s => string.Equals(s.Path, path, StringComparison.OrdinalIgnoreCase));
             if (existing is not null)
             {
+                if (existing.IsKodiSource)
+                {
+                    return false;
+                }
+
                 Current.ScanSources.Remove(existing);
                 Save();
                 return true;
@@ -271,8 +280,8 @@ public sealed class ServerConfigStore
     }
 
     /// <summary>
-    /// Synchronizes a list of sources (e.g. from Kodi sources.xml) with the server's sources.
-    /// Any incoming path not present on server is added. Existing paths retain their server-configured enabled state.
+    /// Synchronizes a list of sources (e.g. from Kodi sources.xml or JSON-RPC) with the server's sources.
+    /// Any incoming path not present on server is added as disabled by default. Existing paths retain their server-configured enabled state.
     /// </summary>
     /// <param name="incoming">Incoming source paths from Kodi.</param>
     /// <returns>The merged and synchronized list of scan sources.</returns>
@@ -293,14 +302,27 @@ public sealed class ServerConfigStore
                 var existing = Current.ScanSources.FirstOrDefault(s => string.Equals(s.Path, item.Path, StringComparison.OrdinalIgnoreCase));
                 if (existing is null)
                 {
-                    Current.ScanSources.Add(item);
+                    // New source from Kodi -> Default Disabled!
+                    Current.ScanSources.Add(new ScanSource(item.Name, item.Path, Enabled: false, item.ContentType, IsKodiSource: true));
                     changed = true;
                 }
-                else if (!string.IsNullOrWhiteSpace(item.ContentType) && !string.Equals(existing.ContentType, item.ContentType, StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    Current.ScanSources.Remove(existing);
-                    Current.ScanSources.Add(new ScanSource(existing.Name, existing.Path, existing.Enabled, item.ContentType));
-                    changed = true;
+                    var updated = existing with
+                    {
+                        Name = !string.IsNullOrWhiteSpace(existing.Name) ? existing.Name : item.Name,
+                        ContentType = !string.IsNullOrWhiteSpace(item.ContentType) && !string.Equals(item.ContentType, "unset", StringComparison.OrdinalIgnoreCase)
+                            ? item.ContentType
+                            : existing.ContentType,
+                        IsKodiSource = existing.IsKodiSource || item.IsKodiSource,
+                    };
+
+                    if (updated != existing)
+                    {
+                        Current.ScanSources.Remove(existing);
+                        Current.ScanSources.Add(updated);
+                        changed = true;
+                    }
                 }
             }
 
@@ -375,7 +397,7 @@ public sealed class ServerConfigStore
         target.ScanSources.Clear();
         foreach (var item in source.ScanSources)
         {
-            target.ScanSources.Add(new ScanSource(item.Name, item.Path, item.Enabled, item.ContentType));
+            target.ScanSources.Add(new ScanSource(item.Name, item.Path, item.Enabled, item.ContentType, item.IsKodiSource));
         }
     }
 
