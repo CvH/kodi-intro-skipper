@@ -118,3 +118,19 @@ msgctxt "#30048"
 msgid "Displays a live progress window tracking the server's scan status"
 msgstr ""
 
+msgctxt "#30050"
+msgid "Skip Intro"
+msgstr ""
+
+msgctxt "#30051"
+msgid "Skip Credits"
+msgstr ""
+
+msgctxt "#30052"
+msgid "Intro skipped"
+msgstr ""
+
+msgctxt "#30053"
+msgid "Credits skipped"
+msgstr ""
+

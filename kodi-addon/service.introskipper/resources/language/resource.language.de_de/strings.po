@@ -1,0 +1,135 @@
+# IntroSkipper strings.po (German)
+#
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: de_DE\n"
+
+msgctxt "#30000"
+msgid "Connection"
+msgstr "Verbindung"
+
+msgctxt "#30001"
+msgid "Server URL"
+msgstr "Server-URL"
+
+msgctxt "#30002"
+msgid "Base URL of the IntroSkipper server (e.g. http://192.168.1.100:8037)"
+msgstr "Basis-URL des IntroSkipper-Servers (z. B. http://192.168.1.100:8037)"
+
+msgctxt "#30003"
+msgid "Request Timeout (seconds)"
+msgstr "Anfrage-Timeout (Sekunden)"
+
+msgctxt "#30004"
+msgid "Maximum seconds to wait for server response"
+msgstr "Maximale Wartezeit auf Serverantwort"
+
+msgctxt "#30010"
+msgid "Skip Behavior"
+msgstr "Überspring-Verhalten"
+
+msgctxt "#30011"
+msgid "Intro Action"
+msgstr "Intro-Aktion"
+
+msgctxt "#30012"
+msgid "Show Prompt (Skip Button)"
+msgstr "Button anzeigen (Überspringen)"
+
+msgctxt "#30013"
+msgid "Automatically Skip"
+msgstr "Automatisch überspringen"
+
+msgctxt "#30014"
+msgid "Disabled"
+msgstr "Deaktiviert"
+
+msgctxt "#30015"
+msgid "Prompt Duration (seconds)"
+msgstr "Anzeigedauer des Buttons (Sekunden)"
+
+msgctxt "#30020"
+msgid "Credits Action"
+msgstr "Abspann-Aktion"
+
+msgctxt "#30021"
+msgid "Play Next Episode"
+msgstr "Nächste Episode abspielen"
+
+msgctxt "#30022"
+msgid "Credits Prompt Duration (seconds)"
+msgstr "Abspann-Anzeigedauer (Sekunden)"
+
+msgctxt "#30030"
+msgid "Path Mapping"
+msgstr "Pfadzuordnung"
+
+msgctxt "#30031"
+msgid "Client Path Prefix"
+msgstr "Client-Pfadpräfix"
+
+msgctxt "#30032"
+msgid "Path prefix as seen by Kodi (e.g. smb://192.168.1.50/tv/)"
+msgstr "Pfadpräfix aus Kodi-Sicht (z. B. smb://192.168.1.50/tv/)"
+
+msgctxt "#30033"
+msgid "Server Path Prefix"
+msgstr "Server-Pfadpräfix"
+
+msgctxt "#30034"
+msgid "Path prefix as seen by the server (e.g. /mnt/media/tv/)"
+msgstr "Pfadpräfix aus Server-Sicht (z. B. /storage/tvshows/)"
+
+msgctxt "#30040"
+msgid "Scan Management"
+msgstr "Scan-Verwaltung"
+
+msgctxt "#30041"
+msgid "Configure Sources to Scan..."
+msgstr "Quellen zum Scannen konfigurieren..."
+
+msgctxt "#30042"
+msgid "Select which video sources from sources.xml should be scanned for intros"
+msgstr "Auswählen, welche Quellen aus sources.xml nach Intros gescannt werden"
+
+msgctxt "#30043"
+msgid "Start Scan on Enabled Sources"
+msgstr "Scan für aktivierte Quellen starten"
+
+msgctxt "#30044"
+msgid "Triggers analysis on the IntroSkipper server for all enabled sources"
+msgstr "Startet die Intro-Erkennung auf dem Server für alle aktiven Quellen"
+
+msgctxt "#30045"
+msgid "Check Server & Scan Status"
+msgstr "Server- & Scan-Status prüfen"
+
+msgctxt "#30046"
+msgid "Shows current scan progress, queue state, and database information"
+msgstr "Zeigt den Scan-Fortschritt, Warteschlange und Datenbank-Info an"
+
+msgctxt "#30047"
+msgid "Open Live Scan Monitor"
+msgstr "Live-Scan-Monitor öffnen"
+
+msgctxt "#30048"
+msgid "Displays a live progress window tracking the server's scan status"
+msgstr "Öffnet ein Live-Fortschrittsfenster zum aktuellen Server-Scan"
+
+msgctxt "#30050"
+msgid "Skip Intro"
+msgstr "Intro überspringen"
+
+msgctxt "#30051"
+msgid "Skip Credits"
+msgstr "Abspann überspringen"
+
+msgctxt "#30052"
+msgid "Intro skipped"
+msgstr "Intro übersprungen"
+
+msgctxt "#30053"
+msgid "Credits skipped"
+msgstr "Abspann übersprungen"
