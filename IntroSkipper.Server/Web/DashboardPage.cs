@@ -480,38 +480,38 @@ public static class DashboardPage
     <div class="header-content">
       <a href="#" class="brand">
         <div class="brand-icon">
-          <svg width="36" height="36" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg width="100%" height="100%" viewBox="0 0 512 512" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
             <g transform="matrix(0.808504,0,0,0.808504,-59.98895,-55.14606)">
-              <clipPath id="_brand_clip1">
+              <clipPath id="_clip1">
                 <path d="M192,269C204.667,256.333 211,259 211,277L211,495C211,513 204.667,515.667 192,503L101,412C83.667,394.667 83.667,377.333 101,360L192,269Z"/>
               </clipPath>
-              <g clip-path="url(#_brand_clip1)">
+              <g clip-path="url(#_clip1)">
                 <rect x="60" y="235" width="165" height="300" style="fill:rgb(65,197,244);"/>
               </g>
             </g>
             <g transform="matrix(0.847506,0,0,0.847506,-83.956849,-50.154903)">
-              <clipPath id="_brand_clip2">
+              <clipPath id="_clip2">
                 <path d="M380,81C393.333,67.667 406.667,67.667 420,81L516,177C529.333,190.333 529.333,203.667 516,217L304,429C291.333,441.667 285,439 285,421L285,198C285,183.333 290.333,170.667 301,160L380,81Z"/>
               </clipPath>
-              <g clip-path="url(#_brand_clip2)">
+              <g clip-path="url(#_clip2)">
                 <rect x="275" y="50" width="125" height="410" style="fill:rgb(65,197,244);"/>
                 <rect x="400" y="50" width="150" height="410" style="fill:rgb(19,166,224);"/>
               </g>
             </g>
             <g transform="matrix(0.905622,0,0,0.905622,-106.808846,-150.971416)">
-              <clipPath id="_brand_clip3">
+              <clipPath id="_clip3">
                 <path d="M380,511C393.333,497.667 406.667,497.667 420,511L500,591C513.333,604.333 513.333,617.667 500,631L420,711C406.667,724.333 393.333,724.333 380,711L300,631C286.667,617.667 286.667,604.333 300,591L380,511Z"/>
               </clipPath>
-              <g clip-path="url(#_brand_clip3)">
+              <g clip-path="url(#_clip3)">
                 <rect x="270" y="480" width="130" height="260" style="fill:rgb(6,166,222);"/>
                 <rect x="400" y="480" width="130" height="260" style="fill:rgb(6,141,196);"/>
               </g>
             </g>
             <g transform="matrix(0.905537,0,0,0.905537,-120.357583,-92.484582)">
-              <clipPath id="_brand_clip4">
+              <clipPath id="_clip4">
                 <path d="M556,286C569.333,272.667 582.667,272.667 596,286L676,366C689.333,379.333 689.333,392.667 676,406L596,486C582.667,499.333 569.333,499.333 556,486L476,406C462.667,392.667 462.667,379.333 476,366L556,286Z"/>
               </clipPath>
-              <g clip-path="url(#_brand_clip4)">
+              <g clip-path="url(#_clip4)">
                 <rect x="445" y="255" width="260" height="260" style="fill:rgb(4,136,190);"/>
               </g>
             </g>
