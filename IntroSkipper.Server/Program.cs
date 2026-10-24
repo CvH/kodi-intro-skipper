@@ -182,6 +182,108 @@ var handleStartScan = (
 app.MapPost("/api/scan", handleStartScan);
 app.MapPost("/api/scan/start", handleStartScan);
 
+// Single item / episode scan endpoint
+app.MapPost("/api/scan/item", async (
+    [FromBody] ScanItemRequest request,
+    MediaScanner scanner,
+    MediaFileIndex fileIndex,
+    StandaloneAnalyzer analyzer,
+    AnalysisQueue queue,
+    ServerStorage storage,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(request?.Path))
+    {
+        return Results.BadRequest(new { error = "Path is required." });
+    }
+
+    var series = request.Series;
+    var season = request.Season ?? 1;
+    var episode = request.Episode ?? 1;
+    var title = request.Title ?? string.Empty;
+
+    if (string.IsNullOrWhiteSpace(series))
+    {
+        if (scanner.TryParseEpisode(request.Path, out var parsed) && parsed is not null)
+        {
+            series = parsed.SeriesName;
+            season = parsed.SeasonNumber;
+            episode = parsed.EpisodeNumber;
+            title = parsed.Title;
+        }
+        else
+        {
+            series = Path.GetFileNameWithoutExtension(request.Path);
+        }
+    }
+
+    var episodeInfo = new ParsedEpisodeInfo(request.Path, series, season, episode, title);
+    fileIndex.Register(episodeInfo);
+
+    if (request.Wait)
+    {
+        // Try to include sibling episodes from the same folder so Chromaprint cross-episode fingerprinting works
+        var dir = Path.GetDirectoryName(request.Path);
+        if (string.IsNullOrEmpty(dir) && request.Path.Contains('/'))
+        {
+            dir = request.Path[..request.Path.LastIndexOf('/')];
+        }
+
+        IReadOnlyList<ParsedEpisodeInfo> batch = [episodeInfo];
+        if (!string.IsNullOrEmpty(dir))
+        {
+            try
+            {
+                var folderEpisodes = await scanner.ScanDirectoryAsync(dir, ct).ConfigureAwait(false);
+                var sameSeason = folderEpisodes.Where(e => e.SeriesName.Equals(series, StringComparison.OrdinalIgnoreCase) && e.SeasonNumber == season).ToList();
+                if (sameSeason.Count > 1)
+                {
+                    batch = sameSeason;
+                    foreach (var ep in sameSeason)
+                    {
+                        fileIndex.Register(ep);
+                    }
+                }
+            }
+            catch
+            {
+                // Fall back to single episode
+            }
+        }
+
+        await analyzer.AnalyzeSeasonAsync(batch, request.ExportEdl, ct).ConfigureAwait(false);
+
+        var episodeId = ItemIdGenerator.FromPath(request.Path);
+        var stored = await storage.Database.GetSegmentsAsync(episodeId, cancellationToken: ct).ConfigureAwait(false);
+        var segResponses = stored.Select(s => new SegmentResponse(
+            s.Id,
+            s.Type.ToString(),
+            TickConversions.ToSeconds(s.StartTicks),
+            TickConversions.ToSeconds(s.EndTicks),
+            s.Source.ToString())).ToList();
+
+        return Results.Ok(new ScanItemResponse(
+            request.Path,
+            series,
+            season,
+            episode,
+            segResponses,
+            $"Analysis complete. Found {segResponses.Count} segment(s)."));
+    }
+    else
+    {
+        queue.Enqueue(request.Path, request.ExportEdl);
+        return Results.Accepted("/api/scan/status", new ScanItemResponse(
+            request.Path,
+            series,
+            season,
+            episode,
+            [],
+            "Analysis enqueued."));
+    }
+});
+
+
 // Stop scan endpoint
 app.MapPost("/api/scan/stop", (AnalysisQueue queue) =>
 {

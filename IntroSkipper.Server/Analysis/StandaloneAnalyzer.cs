@@ -180,6 +180,25 @@ public sealed class StandaloneAnalyzer(
     }
 
     /// <summary>
+    /// Analyzes a single episode on demand and returns its detected segment entities.
+    /// </summary>
+    /// <param name="episodeInfo">Parsed episode info.</param>
+    /// <param name="exportEdl">Whether to generate Kodi EDL files alongside the media.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of detected segment entities for the episode.</returns>
+    public async Task<IReadOnlyList<DbSegment>> AnalyzeItemAsync(
+        ParsedEpisodeInfo episodeInfo,
+        bool exportEdl = false,
+        CancellationToken cancellationToken = default)
+    {
+        await AnalyzeSeasonAsync([episodeInfo], exportEdl, cancellationToken).ConfigureAwait(false);
+
+        var episodeId = ItemIdGenerator.FromPath(episodeInfo.FilePath);
+        return await _database.GetSegmentsAsync(episodeId, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+
+    /// <summary>
     /// Exports detected segments into a Kodi-compatible .edl file next to the video.
     /// </summary>
     /// <param name="episodeId">Episode Item ID.</param>

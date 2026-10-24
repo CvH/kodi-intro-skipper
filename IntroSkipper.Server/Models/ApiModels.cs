@@ -65,3 +65,40 @@ public sealed record ServerLogsResponse(
     int TotalLines,
     string LogPath);
 
+/// <summary>
+/// Request to scan and analyze a single item / episode on demand.
+/// </summary>
+/// <param name="Path">Full file path or network URI of the video.</param>
+/// <param name="Series">Series title (optional).</param>
+/// <param name="Season">Season number (optional).</param>
+/// <param name="Episode">Episode number (optional).</param>
+/// <param name="Title">Episode title (optional).</param>
+/// <param name="ExportEdl">Whether to generate EDL file.</param>
+/// <param name="Wait">Whether to wait for analysis completion and return detected segments.</param>
+public sealed record ScanItemRequest(
+    string Path,
+    string? Series = null,
+    int? Season = null,
+    int? Episode = null,
+    string? Title = null,
+    bool ExportEdl = false,
+    bool Wait = true);
+
+/// <summary>
+/// Response returned from scanning a single item on demand.
+/// </summary>
+/// <param name="Path">Target file path.</param>
+/// <param name="Series">Series name.</param>
+/// <param name="Season">Season number.</param>
+/// <param name="Episode">Episode number.</param>
+/// <param name="Segments">Detected segments for this item.</param>
+/// <param name="Message">Summary message.</param>
+public sealed record ScanItemResponse(
+    string Path,
+    string Series,
+    int Season,
+    int Episode,
+    IReadOnlyList<SegmentResponse> Segments,
+    string Message);
+
+
