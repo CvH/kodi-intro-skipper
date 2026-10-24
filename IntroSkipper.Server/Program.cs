@@ -363,5 +363,6 @@ app.MapPost("/api/config/reset", (ServerConfigStore configStore) => Results.Ok(c
 // Interactive web dashboard & settings
 app.MapGet("/", () => Results.Content(DashboardPage.GetHtml(), "text/html"));
 app.MapGet("/settings", () => Results.Content(DashboardPage.GetHtml(), "text/html"));
+app.MapGet("/fonts/inter.woff2", () => Results.Bytes(DashboardPage.GetFontBytes(), "font/woff2"));
 
 await app.RunAsync().ConfigureAwait(false);

@@ -20,4 +20,8 @@
     <ProjectReference Include="..\IntroSkipper\IntroSkipper.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Web/Fonts/inter.woff2" />
+  </ItemGroup>
+
 </Project>

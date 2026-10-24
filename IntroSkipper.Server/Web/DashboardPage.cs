@@ -15,10 +15,14 @@ public static class DashboardPage
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>IntroSkipper Dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url('/fonts/inter.woff2') format('woff2');
+    }
     :root {
       --bg: #090d16;
       --bg-card: rgba(17, 24, 39, 0.85);
@@ -1480,9 +1484,31 @@ public static class DashboardPage
 </html>
 """;
 
+    private static readonly byte[] FontBytes = LoadEmbeddedFont();
+
     /// <summary>
     /// Returns the full HTML string for the web dashboard.
     /// </summary>
     /// <returns>HTML document string.</returns>
     public static string GetHtml() => HtmlContent;
+
+    /// <summary>
+    /// Returns the bundled Inter WOFF2 font binary.
+    /// </summary>
+    /// <returns>Raw byte array of the font file.</returns>
+    public static byte[] GetFontBytes() => FontBytes;
+
+    private static byte[] LoadEmbeddedFont()
+    {
+        var assembly = typeof(DashboardPage).Assembly;
+        using var stream = assembly.GetManifestResourceStream("IntroSkipper.Server.Web.Fonts.inter.woff2");
+        if (stream is null)
+        {
+            return [];
+        }
+
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        return ms.ToArray();
+    }
 }
