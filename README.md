@@ -2,7 +2,7 @@
 
 <div align="center">
     <p>
-        <img alt="Plugin Banner" src="https://raw.githubusercontent.com/intro-skipper/intro-skipper/12.0/images/logo.png" />
+        <img alt="Kodi Intro Skipper" src="images/kodi-intro-skipper-full-logo.svg" width="450" />
     </p>
     <p>
         Standalone intro and credit detection daemon and native Kodi add-on.
