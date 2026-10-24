@@ -18,6 +18,12 @@ internal static class SqlitePragmas
     /// </summary>
     public const string BusyTimeoutCommand = "PRAGMA busy_timeout=5000;";
 
+    /// <summary>
+    /// Combined per-connection pragmas applied by <see cref="SqlitePragmaInterceptor"/>:
+    /// busy timeout of 5000ms and synchronous=NORMAL (fully crash-safe in WAL mode, eliminating redundant fsyncs).
+    /// </summary>
+    public const string ConnectionPragmasCommand = "PRAGMA busy_timeout=5000; PRAGMA synchronous=NORMAL;";
+
     private const string WalCommand = "PRAGMA journal_mode=WAL;";
 
     private static readonly SqlitePragmaInterceptor _pragmaInterceptor = new();

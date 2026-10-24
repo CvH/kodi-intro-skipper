@@ -22,12 +22,12 @@ internal sealed class SqlitePragmaInterceptor : DbConnectionInterceptor
         using var cmd = connection.CreateCommand();
         try
         {
-            cmd.CommandText = SqlitePragmas.BusyTimeoutCommand;
+            cmd.CommandText = SqlitePragmas.ConnectionPragmasCommand;
             cmd.ExecuteNonQuery();
         }
         catch (SqliteException)
         {
-            // Fall back to SQLite defaults when optional pragmas such as busy_timeout cannot be applied.
+            // Fall back to SQLite defaults when optional pragmas cannot be applied.
         }
     }
 
@@ -36,12 +36,12 @@ internal sealed class SqlitePragmaInterceptor : DbConnectionInterceptor
         using var cmd = connection.CreateCommand();
         try
         {
-            cmd.CommandText = SqlitePragmas.BusyTimeoutCommand;
+            cmd.CommandText = SqlitePragmas.ConnectionPragmasCommand;
             await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (SqliteException)
         {
-            // Fall back to SQLite defaults when optional pragmas such as busy_timeout cannot be applied.
+            // Fall back to SQLite defaults when optional pragmas cannot be applied.
         }
     }
 }
