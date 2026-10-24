@@ -451,6 +451,11 @@ public static class DashboardPage
     .toast.success { border-left: 4px solid var(--success); }
     .toast.error { border-left: 4px solid var(--danger); }
 
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
     /* Scan progress bar */
     .progress-bar-wrap {
       width: 100%;
@@ -1224,6 +1229,29 @@ public static class DashboardPage
     <span id="toastMsg">Notification</span>
   </div>
 
+  <!-- Confirm Enable Non-TV Source Modal -->
+  <div id="confirmSourceModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: #18181b; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: var(--radius-md); max-width: 460px; width: 100%; padding: 22px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6); animation: modalFadeIn 0.15s ease-out;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+        <span style="font-size: 1.5rem; line-height: 1;">⚠️</span>
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: #fbbf24; margin: 0;">Enable Non-TV Show Source?</h3>
+      </div>
+      <p style="font-size: 0.88rem; color: var(--text-main); line-height: 1.5; margin-bottom: 12px;">
+        The source <strong id="confirmModalSourceName" style="color: #fff;"></strong> is configured as <span id="confirmModalContentType" style="display: inline-block; font-size: 0.75rem; padding: 1px 7px; border-radius: 9999px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 600;"></span> in Kodi.
+      </p>
+      <div style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b; padding: 10px 12px; border-radius: 4px; font-size: 0.82rem; color: #fbbf24; line-height: 1.45; margin-bottom: 18px;">
+        Intro and credit detection requires episodic television series. Scanning movies or non-episodic media will not detect intro sequences and will waste analysis time.
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 20px;">
+        Are you really sure you want to enable automatic scanning for this source?
+      </p>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button id="confirmModalCancelBtn" class="btn btn-secondary" style="padding: 7px 16px;">Cancel</button>
+        <button id="confirmModalOkBtn" class="btn btn-primary" style="background: #f59e0b; border-color: #d97706; color: #000; font-weight: 600; padding: 7px 16px;">Enable Anyway</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let activeConfig = {};
     let isDirty = false;
@@ -1641,6 +1669,56 @@ public static class DashboardPage
       }
     }
 
+    function showConfirmEnableModal(src, onConfirm) {
+      const modal = document.getElementById('confirmSourceModal');
+      const nameEl = document.getElementById('confirmModalSourceName');
+      const typeEl = document.getElementById('confirmModalContentType');
+      if (!modal) {
+        if (confirm(`Warning: "${src?.name || src?.path}" is configured as "${src?.contentType}" (not TV Shows). Intro and credit detection only works for TV shows.\n\nAre you sure you want to enable this source?`)) {
+          onConfirm();
+        }
+        return;
+      }
+
+      nameEl.textContent = src ? (src.name || src.path) : 'Media Source';
+      const cType = (src?.contentType || 'unset').toLowerCase();
+      typeEl.textContent = cType === 'movies' ? 'Movies' : (src?.contentType || 'Not Set');
+      modal.style.display = 'flex';
+
+      const cancelBtn = document.getElementById('confirmModalCancelBtn');
+      const okBtn = document.getElementById('confirmModalOkBtn');
+
+      const cleanup = () => {
+        modal.style.display = 'none';
+        cancelBtn.removeEventListener('click', onCancel);
+        okBtn.removeEventListener('click', onOk);
+        modal.removeEventListener('click', onBackdrop);
+        document.removeEventListener('keydown', onKeyDown);
+      };
+
+      const onCancel = () => {
+        cleanup();
+      };
+
+      const onOk = () => {
+        cleanup();
+        onConfirm();
+      };
+
+      const onBackdrop = (e) => {
+        if (e.target === modal) cleanup();
+      };
+
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape') cleanup();
+      };
+
+      cancelBtn.addEventListener('click', onCancel);
+      okBtn.addEventListener('click', onOk);
+      modal.addEventListener('click', onBackdrop);
+      document.addEventListener('keydown', onKeyDown);
+    }
+
     function renderSources(sources) {
       const container = document.getElementById('sourcesList');
       if (!container) return;
@@ -1669,19 +1747,14 @@ public static class DashboardPage
           ? '<span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(99, 102, 241, 0.18); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3);">📺 TV Shows</span>'
           : `<span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 600;">⚠️ ${escapeHtml(cType === 'movies' ? 'Movies' : (src.contentType || 'Not Set'))}</span>`;
 
-        const warningBox = isTvShow ? '' : `
-          <div style="margin-top: 6px; padding: 6px 10px; background: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 0.78rem; color: #fbbf24; display: flex; align-items: center; gap: 6px;">
-            <span>⚠️</span>
-            <span><strong>Warning:</strong> This source is not configured as <strong>TV Shows</strong> in Kodi (content: <em>${escapeHtml(src.contentType || 'unset')}</em>). Intro and credit detection only applies to TV series.</span>
-          </div>
-        `;
-
+        const rowOpacity = isTvShow ? '1' : (src.enabled ? '0.75' : '0.45');
+        const rowFilter = isTvShow ? 'none' : 'grayscale(0.4)';
         const rowBorder = (!isTvShow && src.enabled)
           ? 'border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.04);'
           : 'border: 1px solid var(--border); background: rgba(255, 255, 255, 0.03);';
 
         return `
-          <div style="display: flex; flex-direction: column; padding: 10px 14px; border-radius: var(--radius-sm); ${rowBorder}">
+          <div style="display: flex; flex-direction: column; padding: 10px 14px; border-radius: var(--radius-sm); opacity: ${rowOpacity}; filter: ${rowFilter}; ${rowBorder} transition: opacity 0.2s ease, border 0.2s ease;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; margin-right: 12px;">
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -1700,7 +1773,6 @@ public static class DashboardPage
                 <button class="btn btn-danger source-del-btn" data-path="${escapeAttr(src.path)}" title="Remove source" style="padding: 5px 9px; font-size: 0.8rem;">🗑</button>
               </div>
             </div>
-            ${warningBox}
           </div>
         `;
       }).join('');
@@ -1712,31 +1784,47 @@ public static class DashboardPage
           const path = el.dataset.path;
           const enabled = el.checked;
           const src = currentSources.find(s => s.path === path);
-          try {
-            const res = await fetch('/api/sources', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                name: src ? src.name : '',
-                path,
-                enabled,
-                contentType: src ? src.contentType : 'tvshows'
-              })
-            });
-            if (res.ok) {
-              const isTv = (src?.contentType || 'tvshows').toLowerCase() === 'tvshows';
-              if (enabled && !isTv) {
-                showToast(`Source enabled (Warning: Content is ${src?.contentType || 'not TV Shows'})`, false);
+          const isTv = (src?.contentType || 'tvshows').toLowerCase() === 'tvshows';
+
+          const applyToggle = async () => {
+            try {
+              const res = await fetch('/api/sources', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: src ? src.name : '',
+                  path,
+                  enabled,
+                  contentType: src ? src.contentType : 'tvshows'
+                })
+              });
+              if (res.ok) {
+                if (enabled && !isTv) {
+                  showToast(`Source enabled (Warning: Content is ${src?.contentType || 'not TV Shows'})`, false);
+                } else {
+                  showToast(`Source ${enabled ? 'enabled' : 'disabled'}`);
+                }
+                loadSources();
               } else {
-                showToast(`Source ${enabled ? 'enabled' : 'disabled'}`);
+                showToast('Failed to update source', false);
+                el.checked = !enabled;
               }
-              loadSources();
-            } else {
-              showToast('Failed to update source', false);
+            } catch (e) {
+              showToast('Error: ' + e, false);
+              el.checked = !enabled;
             }
-          } catch (e) {
-            showToast('Error: ' + e, false);
+          };
+
+          if (enabled && !isTv) {
+            el.checked = false;
+            showConfirmEnableModal(src, () => {
+              el.checked = true;
+              applyToggle();
+            });
+            return;
           }
+
+          applyToggle();
         });
       });
 
