@@ -429,12 +429,14 @@ curl -s http://127.0.0.1:8037/api/sources
   {
     "name": "TV Shows",
     "path": "/storage/tvshows",
-    "enabled": true
+    "enabled": true,
+    "contentType": "tvshows"
   },
   {
-    "name": "Anime Share",
-    "path": "smb://192.168.0.99/Media/Anime",
-    "enabled": false
+    "name": "Movies Share",
+    "path": "smb://NAS/Filme/",
+    "enabled": false,
+    "contentType": "movies"
   }
 ]
 ```
@@ -447,7 +449,7 @@ curl -s http://127.0.0.1:8037/api/sources
 ##### Curl Example: Add or Enable a Media Source
 ```bash
 curl -s -X POST -H "Content-Type: application/json" \
-  -d '{"name": "TV Shows", "path": "/storage/tvshows", "enabled": true}' \
+  -d '{"name": "TV Shows", "path": "/storage/tvshows", "enabled": true, "contentType": "tvshows"}' \
   http://127.0.0.1:8037/api/sources
 ```
 
@@ -456,12 +458,12 @@ curl -s -X POST -H "Content-Type: application/json" \
 - **Path:** `/api/sources/sync`
 - **Headers:** `Content-Type: application/json`
 
-Merges incoming sources (e.g. from Kodi `sources.xml`). Any incoming path not already on the server is added; existing paths maintain their server-configured enabled state. Returns the merged list.
+Merges incoming sources (e.g. from Kodi `sources.xml`). Discovers content types (`tvshows`, `movies`, `unset`) from Kodi's video database. Any source not configured as `tvshows` displays a warning indicator in the web interface and Kodi add-on dialogs.
 
 ##### Curl Example
 ```bash
 curl -s -X POST -H "Content-Type: application/json" \
-  -d '{"sources": [{"name": "TV Shows", "path": "/storage/tvshows", "enabled": true}]}' \
+  -d '{"sources": [{"name": "TV Shows", "path": "/storage/tvshows", "enabled": true, "contentType": "tvshows"}]}' \
   http://127.0.0.1:8037/api/sources/sync
 ```
 

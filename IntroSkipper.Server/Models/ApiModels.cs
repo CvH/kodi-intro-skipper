@@ -130,10 +130,12 @@ public sealed record ServerStatsResponse(
 /// <param name="Name">Friendly name of the source.</param>
 /// <param name="Path">Filesystem or network share path.</param>
 /// <param name="Enabled">Whether the source is enabled.</param>
+/// <param name="ContentType">Kodi content type (e.g. "tvshows", "movies", "unset").</param>
 public sealed record ScanSourceRequest(
     string? Name = null,
     string Path = "",
-    bool? Enabled = null);
+    bool? Enabled = null,
+    string? ContentType = null);
 
 /// <summary>
 /// Request to synchronize multiple scan sources.

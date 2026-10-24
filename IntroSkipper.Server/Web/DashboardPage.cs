@@ -559,8 +559,13 @@ public static class DashboardPage
         <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px;">
           <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: var(--text-muted);">Add New Source Path</div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <input type="text" id="newSourceName" placeholder="Name (e.g. TV Shows)" style="max-width: 180px;" />
+            <input type="text" id="newSourceName" placeholder="Name (e.g. TV Shows)" style="max-width: 170px;" />
             <input type="text" id="newSourcePath" placeholder="Path (e.g. /storage/tvshows or smb://server/TV)" style="max-width: none; flex: 1; min-width: 200px;" />
+            <select id="newSourceContentType" style="max-width: 130px; font-size: 0.85rem;">
+              <option value="tvshows">📺 TV Shows</option>
+              <option value="movies">🎬 Movies</option>
+              <option value="unset">❓ Unset</option>
+            </select>
             <button id="addSourceBtn" class="btn btn-secondary">+ Add Source</button>
           </div>
         </div>
@@ -1643,25 +1648,64 @@ public static class DashboardPage
         container.innerHTML = '<div style="color: var(--text-dim); font-size: 0.85rem; padding: 8px 0;">No media sources configured yet. Add a directory or network share below.</div>';
         return;
       }
-      container.innerHTML = sources.map(src => `
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(255, 255, 255, 0.03); border-radius: var(--radius-sm); border: 1px solid var(--border);">
-          <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; margin-right: 12px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(src.name || 'Media Source')}</span>
-              <span style="font-size: 0.75rem; padding: 1px 7px; border-radius: 9999px; background: ${src.enabled ? 'rgba(16, 185, 129, 0.15); color: #34d399;' : 'rgba(156, 163, 175, 0.15); color: #9ca3af;'}">${src.enabled ? 'Enabled' : 'Disabled'}</span>
+
+      const hasNonTvEnabled = sources.some(s => (s.contentType || 'tvshows').toLowerCase() !== 'tvshows' && s.enabled);
+      let bannerHtml = '';
+      if (hasNonTvEnabled) {
+        bannerHtml = `
+          <div style="padding: 10px 14px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: var(--radius-sm); color: #fbbf24; font-size: 0.82rem; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 10px;">
+            <span style="font-size: 1.1rem; line-height: 1;">⚠️</span>
+            <div>
+              <strong>Warning:</strong> One or more enabled sources are not set to <strong>TV Shows</strong> in Kodi. IntroSkipper is designed for television series; scanning movie or other non-episodic sources will not detect intro sequences.
             </div>
-            <span style="font-size: 0.82rem; color: var(--text-dim); word-break: break-all; font-family: monospace;">${escapeHtml(src.path)}</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-            <label class="switch" title="Toggle scanning for this source">
-              <input type="checkbox" class="source-toggle" data-path="${escapeAttr(src.path)}" ${src.enabled ? 'checked' : ''}>
-              <span class="slider"></span>
-            </label>
-            <button class="btn btn-secondary source-scan-btn" data-path="${escapeAttr(src.path)}" title="Scan this source" style="padding: 5px 9px; font-size: 0.8rem;">▶</button>
-            <button class="btn btn-danger source-del-btn" data-path="${escapeAttr(src.path)}" title="Remove source" style="padding: 5px 9px; font-size: 0.8rem;">🗑</button>
+        `;
+      }
+
+      const rowsHtml = sources.map(src => {
+        const cType = (src.contentType || 'tvshows').toLowerCase();
+        const isTvShow = cType === 'tvshows';
+        const typeBadge = isTvShow
+          ? '<span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(99, 102, 241, 0.18); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3);">📺 TV Shows</span>'
+          : `<span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 600;">⚠️ ${escapeHtml(cType === 'movies' ? 'Movies' : (src.contentType || 'Not Set'))}</span>`;
+
+        const warningBox = isTvShow ? '' : `
+          <div style="margin-top: 6px; padding: 6px 10px; background: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 0.78rem; color: #fbbf24; display: flex; align-items: center; gap: 6px;">
+            <span>⚠️</span>
+            <span><strong>Warning:</strong> This source is not configured as <strong>TV Shows</strong> in Kodi (content: <em>${escapeHtml(src.contentType || 'unset')}</em>). Intro and credit detection only applies to TV series.</span>
           </div>
-        </div>
-      `).join('');
+        `;
+
+        const rowBorder = (!isTvShow && src.enabled)
+          ? 'border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.04);'
+          : 'border: 1px solid var(--border); background: rgba(255, 255, 255, 0.03);';
+
+        return `
+          <div style="display: flex; flex-direction: column; padding: 10px 14px; border-radius: var(--radius-sm); ${rowBorder}">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; margin-right: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <span style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(src.name || 'Media Source')}</span>
+                  ${typeBadge}
+                  <span style="font-size: 0.72rem; padding: 1px 7px; border-radius: 9999px; background: ${src.enabled ? 'rgba(16, 185, 129, 0.15); color: #34d399;' : 'rgba(156, 163, 175, 0.15); color: #9ca3af;'}">${src.enabled ? 'Enabled' : 'Disabled'}</span>
+                </div>
+                <span style="font-size: 0.82rem; color: var(--text-dim); word-break: break-all; font-family: monospace;">${escapeHtml(src.path)}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                <label class="switch" title="Toggle scanning for this source">
+                  <input type="checkbox" class="source-toggle" data-path="${escapeAttr(src.path)}" ${src.enabled ? 'checked' : ''}>
+                  <span class="slider"></span>
+                </label>
+                <button class="btn btn-secondary source-scan-btn" data-path="${escapeAttr(src.path)}" title="Scan this source" style="padding: 5px 9px; font-size: 0.8rem;">▶</button>
+                <button class="btn btn-danger source-del-btn" data-path="${escapeAttr(src.path)}" title="Remove source" style="padding: 5px 9px; font-size: 0.8rem;">🗑</button>
+              </div>
+            </div>
+            ${warningBox}
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = bannerHtml + rowsHtml;
 
       container.querySelectorAll('.source-toggle').forEach(el => {
         el.addEventListener('change', async () => {
@@ -1672,10 +1716,20 @@ public static class DashboardPage
             const res = await fetch('/api/sources', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: src ? src.name : '', path, enabled })
+              body: JSON.stringify({
+                name: src ? src.name : '',
+                path,
+                enabled,
+                contentType: src ? src.contentType : 'tvshows'
+              })
             });
             if (res.ok) {
-              showToast(`Source ${enabled ? 'enabled' : 'disabled'}`);
+              const isTv = (src?.contentType || 'tvshows').toLowerCase() === 'tvshows';
+              if (enabled && !isTv) {
+                showToast(`Source enabled (Warning: Content is ${src?.contentType || 'not TV Shows'})`, false);
+              } else {
+                showToast(`Source ${enabled ? 'enabled' : 'disabled'}`);
+              }
               loadSources();
             } else {
               showToast('Failed to update source', false);
@@ -1730,8 +1784,10 @@ public static class DashboardPage
     document.getElementById('addSourceBtn').addEventListener('click', async () => {
       const nameInp = document.getElementById('newSourceName');
       const pathInp = document.getElementById('newSourcePath');
+      const typeInp = document.getElementById('newSourceContentType');
       const name = nameInp.value.trim();
       const path = pathInp.value.trim();
+      const contentType = typeInp ? typeInp.value : 'tvshows';
       if (!path) {
         alert('Please enter a source folder or network share path.');
         return;
@@ -1740,7 +1796,7 @@ public static class DashboardPage
         const res = await fetch('/api/sources', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, path, enabled: true })
+          body: JSON.stringify({ name, path, enabled: true, contentType })
         });
         if (res.ok) {
           showToast('Source added successfully');

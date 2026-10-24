@@ -373,7 +373,7 @@ app.MapPost("/api/sources", (
         return Results.BadRequest(new { error = "Path is required." });
     }
 
-    configStore.SetScanSource(request.Name ?? string.Empty, request.Path, request.Enabled ?? true);
+    configStore.SetScanSource(request.Name ?? string.Empty, request.Path, request.Enabled ?? true, request.ContentType);
     return Results.Ok(configStore.GetScanSources());
 });
 
@@ -383,7 +383,7 @@ app.MapPost("/api/sources/sync", (
 {
     var incoming = (request?.Sources ?? [])
         .Where(s => !string.IsNullOrWhiteSpace(s.Path))
-        .Select(s => new ScanSource(s.Name ?? string.Empty, s.Path, s.Enabled ?? true));
+        .Select(s => new ScanSource(s.Name ?? string.Empty, s.Path, s.Enabled ?? true, s.ContentType ?? "tvshows"));
 
     var synced = configStore.SyncScanSources(incoming);
     return Results.Ok(synced);

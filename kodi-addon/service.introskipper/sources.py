@@ -102,10 +102,52 @@ def save_saved_states(states):
         log(f"Failed to save {config_path}: {ex}")
 
 
+def get_source_content_types():
+    """
+    Queries Kodi's video database (MyVideosXXX.db) to extract content types (e.g. 'tvshows', 'movies').
+    """
+    content_map = {}
+    try:
+        import glob
+        import sqlite3
+        db_dirs = []
+        if xbmcvfs:
+            try:
+                trans = xbmcvfs.translatePath('special://database')
+                if trans and os.path.exists(trans):
+                    db_dirs.append(trans)
+            except Exception:
+                pass
+
+        db_dirs.extend([
+            '/storage/.kodi/userdata/Database',
+            os.path.expanduser('~/.kodi/userdata/Database')
+        ])
+
+        for db_dir in db_dirs:
+            if db_dir and os.path.exists(db_dir):
+                db_files = sorted(glob.glob(os.path.join(db_dir, 'MyVideos*.db')))
+                if db_files:
+                    latest_db = db_files[-1]
+                    conn = sqlite3.connect(latest_db)
+                    c = conn.cursor()
+                    c.execute("SELECT strPath, strContent FROM path WHERE strContent IS NOT NULL AND strContent != ''")
+                    for path_str, content_str in c.fetchall():
+                        if path_str:
+                            content_map[path_str] = content_str
+                            content_map[path_str.rstrip('/\\')] = content_str
+                    conn.close()
+                    break
+    except Exception as ex:
+        log(f"Failed to query Kodi video database for content types: {ex}")
+
+    return content_map
+
+
 def get_video_sources():
     """
-    Parses sources.xml and returns all video source entries with their enable/disable status.
-    Default status is disabled (False).
+    Parses sources.xml and returns all video source entries with their enable/disable status
+    and their Kodi content type (e.g. 'tvshows', 'movies', 'unset').
     """
     xml_path = get_sources_xml_path()
     sources = []
@@ -114,6 +156,7 @@ def get_video_sources():
         return sources
 
     saved_states = load_saved_states()
+    content_map = get_source_content_types()
 
     try:
         tree = ET.parse(xml_path)
@@ -125,12 +168,14 @@ def get_video_sources():
                 for path_elem in source.findall('path'):
                     path = (path_elem.text or '').strip()
                     if path:
-                        # Default is False unless explicitly saved as True
                         is_enabled = bool(saved_states.get(path, False))
+                        norm = path.rstrip('/\\')
+                        content_type = content_map.get(path, content_map.get(norm, 'unset'))
                         sources.append({
                             'name': name,
                             'path': path,
-                            'enabled': is_enabled
+                            'enabled': is_enabled,
+                            'contentType': content_type
                         })
     except Exception as ex:
         log(f"Error parsing sources.xml: {ex}")
@@ -161,7 +206,12 @@ def sync_sources_with_server(server_url, timeout=3):
     local_sources = get_video_sources()
     payload = {
         'sources': [
-            {'name': s['name'], 'path': s['path'], 'enabled': s['enabled']}
+            {
+                'name': s['name'],
+                'path': s['path'],
+                'enabled': s['enabled'],
+                'contentType': s.get('contentType', 'unset')
+            }
             for s in local_sources
         ]
     }
@@ -224,7 +274,12 @@ def push_sources_to_server(server_url, sources_list, timeout=3):
     server_url = server_url.rstrip('/')
     payload = {
         'sources': [
-            {'name': s.get('name', ''), 'path': s.get('path', ''), 'enabled': bool(s.get('enabled', False))}
+            {
+                'name': s.get('name', ''),
+                'path': s.get('path', ''),
+                'enabled': bool(s.get('enabled', False)),
+                'contentType': s.get('contentType', 'tvshows')
+            }
             for s in sources_list
         ]
     }

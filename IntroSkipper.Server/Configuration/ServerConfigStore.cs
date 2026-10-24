@@ -170,9 +170,10 @@ public sealed class ServerConfigStore
                         var name = item.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
                         var path = item.TryGetProperty("path", out var p) ? p.GetString() ?? string.Empty : string.Empty;
                         var enabled = item.TryGetProperty("enabled", out var e) && e.GetBoolean();
+                        var contentType = item.TryGetProperty("contentType", out var c) ? c.GetString() ?? "tvshows" : "tvshows";
                         if (!string.IsNullOrWhiteSpace(path))
                         {
-                            Current.ScanSources.Add(new ScanSource(name, path, enabled));
+                            Current.ScanSources.Add(new ScanSource(name, path, enabled, contentType));
                         }
                     }
                 }
@@ -200,7 +201,8 @@ public sealed class ServerConfigStore
     /// <param name="name">Source friendly name.</param>
     /// <param name="path">Source filesystem or share path.</param>
     /// <param name="enabled">Whether the source is enabled.</param>
-    public void SetScanSource(string name, string path, bool enabled)
+    /// <param name="contentType">Kodi content type (e.g. tvshows, movies, unset).</param>
+    public void SetScanSource(string name, string path, bool enabled, string? contentType = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
@@ -216,7 +218,11 @@ public sealed class ServerConfigStore
                 ? (existing?.Name ?? Path.GetFileName(path.TrimEnd('/', '\\')))
                 : name;
 
-            Current.ScanSources.Add(new ScanSource(friendlyName, path, enabled));
+            var resolvedContentType = !string.IsNullOrWhiteSpace(contentType)
+                ? contentType
+                : (existing?.ContentType ?? "tvshows");
+
+            Current.ScanSources.Add(new ScanSource(friendlyName, path, enabled, resolvedContentType));
             Save();
         }
     }
@@ -271,6 +277,12 @@ public sealed class ServerConfigStore
                 if (existing is null)
                 {
                     Current.ScanSources.Add(item);
+                    changed = true;
+                }
+                else if (!string.IsNullOrWhiteSpace(item.ContentType) && !string.Equals(existing.ContentType, item.ContentType, StringComparison.OrdinalIgnoreCase))
+                {
+                    Current.ScanSources.Remove(existing);
+                    Current.ScanSources.Add(new ScanSource(existing.Name, existing.Path, existing.Enabled, item.ContentType));
                     changed = true;
                 }
             }
@@ -346,7 +358,7 @@ public sealed class ServerConfigStore
         target.ScanSources.Clear();
         foreach (var item in source.ScanSources)
         {
-            target.ScanSources.Add(new ScanSource(item.Name, item.Path, item.Enabled));
+            target.ScanSources.Add(new ScanSource(item.Name, item.Path, item.Enabled, item.ContentType));
         }
     }
 

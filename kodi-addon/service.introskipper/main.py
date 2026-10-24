@@ -257,7 +257,10 @@ def manage_sources():
     labels = []
     preselect = []
     for i, s in enumerate(all_sources):
-        labels.append(f"{s.get('name', 'Media')}  ({s.get('path', '')})")
+        c_type = s.get('contentType', 'tvshows')
+        is_tv = str(c_type).lower() == 'tvshows'
+        prefix = "" if is_tv else f"⚠️ [{c_type}] "
+        labels.append(f"{prefix}{s.get('name', 'Media')}  ({s.get('path', '')})")
         if s.get('enabled'):
             preselect.append(i)
 
@@ -282,7 +285,8 @@ def manage_sources():
         updated_sources.append({
             'name': s.get('name', ''),
             'path': p,
-            'enabled': is_active
+            'enabled': is_active,
+            'contentType': s.get('contentType', 'tvshows')
         })
         if is_active:
             enabled_count += 1
