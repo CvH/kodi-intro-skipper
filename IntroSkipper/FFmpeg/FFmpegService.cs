@@ -145,7 +145,12 @@ internal sealed partial class FFmpegService : IFFmpegService
             versionProbeTimeout ?? DefaultVersionProbeTimeout);
     }
 
-    private static string FFmpegPath => Plugin.Instance?.FFmpegPath ?? "ffmpeg";
+    /// <summary>
+    /// Gets or sets an explicit path to the FFmpeg binary (used when running outside Jellyfin).
+    /// </summary>
+    internal static string? CustomFFmpegPath { get; set; }
+
+    private static string FFmpegPath => CustomFFmpegPath ?? Plugin.Instance?.FFmpegPath ?? "ffmpeg";
 
     /// <inheritdoc/>
     public Task<bool> CheckFFmpegVersionAsync(CancellationToken cancellationToken = default)
