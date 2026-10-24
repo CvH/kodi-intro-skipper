@@ -71,32 +71,38 @@ The standalone daemon handles all media analysis, audio fingerprinting, and segm
 
 ### REST API Endpoints
 
+The standalone daemon exposes a complete REST API. For the full reference with copy-paste `curl` examples and JSON response schemas, see the **[REST API Reference](docs/api.md)**.
+
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/status` | `GET` | Health check, queue count, database path, and FFmpeg / Chromaprint validity |
-| `/api/segments` | `GET` | Returns detected segments for a file (`?path=/path/to/media.mkv` or `?series=Title&season=1&episode=2`) |
-| `/api/scan` | `POST` | Enqueues a folder for scanning: `{"path": "/path/to/media", "exportEdl": false}` |
-| `/api/queue` | `GET` | Lists pending analysis jobs and active season scanning state |
+| `/api/status` | `GET` | Health check, queue count, database path, FFmpeg and Kodi VFS status |
+| `/api/scan/status` | `GET` | Real-time scan progress, pipeline stage, active file, and activity log |
+| `/api/scan` | `POST` | Enqueues a folder or network share (`smb://`, `nfs://`) for scanning |
+| `/api/scan/item` | `POST` | On-demand scan for a single episode (synchronous or background) |
+| `/api/scan/stop` | `POST` | Stops running scan, halts FFmpeg processes, and clears queue |
+| `/api/segments` | `GET` | Returns detected intro/credit segments for a media file or show |
+| `/api/stats` | `GET` | Library statistics: indexed shows, episodes, segments, and time saved |
+| `/api/logs` | `GET` | Recent server logs in structured JSON or raw text |
 
-#### Example: Query Segments
+#### Quick Example: Query Segments
 ```bash
-curl "http://127.0.0.1:8037/api/segments?path=%2Fstorage%2Ftvshows%2FShow%2FS01E01.mkv"
+curl -s "http://127.0.0.1:8037/api/segments?path=smb%3A%2F%2F192.168.0.99%2FAnime%2FDan%20Da%20Dan%20(2024)%2FStaffel%2001%2FDAN%20DA%20DAN%20-%20S01E01.mkv"
 ```
 ```json
 [
   {
-    "id": "01a16d2c-3e4e-7cb1-bb80-ca0d99153e2c",
+    "id": "01a16d94-dfb3-791a-9cfe-a15e9a7f5c09",
     "type": "Introduction",
     "start": 0.0,
-    "end": 26.026,
-    "source": "Chapter"
+    "end": 89.845,
+    "source": "Chromaprint"
   },
   {
-    "id": "01a16d2c-3ea2-71f1-a53c-0ac91d947a77",
+    "id": "01a16dd7-1952-7a37-a494-e31312838ab6",
     "type": "Credits",
-    "start": 421.504,
-    "end": 437.984,
-    "source": "Chapter"
+    "start": 1406.201,
+    "end": 1445.241,
+    "source": "BlackFrame"
   }
 ]
 ```

@@ -82,61 +82,21 @@ sc.exe start IntroSkipper
 
 ---
 
-## API Endpoints
+## REST API Endpoints
 
-### 1. Server Status
-`GET /api/status`
+The server exposes a complete REST API for status monitoring, scanning, querying segments, inspecting logs, and viewing statistics.
 
-Returns current background queue status, database paths, and FFmpeg capability:
-```json
-{
-  "status": "Idle",
-  "queuedJobs": 0,
-  "dataDirectory": "/opt/introskipper",
-  "segmentDatabasePath": "/opt/introskipper/introskipper.db",
-  "ffmpegVersion": "ffmpeg version 8.1.3-Jellyfin",
-  "ffmpegValid": true
-}
-```
+For the complete API documentation with copy-paste `curl` examples and JSON response schemas, see the **[REST API Reference](api.md)**.
 
-### 2. Enqueue Media Scan
-`POST /api/scan`
-
-Scans a folder, groups episodes into seasons, and runs analysis in the background:
-```json
-{
-  "path": "/mnt/storage/tv/Breaking Bad",
-  "exportEdl": false
-}
-```
-*Response: `202 Accepted`*
-
-### 3. Query Segments (Used by Kodi Addon)
-`GET /api/segments?path={filePath}&series={series}&season={season}&episode={episode}`
-
-Example:
-```
-GET /api/segments?series=Breaking+Bad&season=1&episode=1
-```
-Response:
-```json
-[
-  {
-    "id": "019485b0-312a-7182-9654-1b32d3f24021",
-    "type": "Introduction",
-    "start": 124.5,
-    "end": 185.0,
-    "source": "Fingerprint"
-  },
-  {
-    "id": "019485b0-312a-7182-9654-1b32d3f24022",
-    "type": "Credits",
-    "start": 2840.0,
-    "end": 2915.0,
-    "source": "Keyframe"
-  }
-]
-```
+Quick summary of endpoints:
+- `GET /api/status`: Server health, queue length, FFmpeg capability, and Kodi VFS state.
+- `GET /api/scan/status`: Real-time scan progress, pipeline stage, active file, and activity log.
+- `POST /api/scan`: Enqueue a directory or network share (`smb://`, `nfs://`) for background analysis.
+- `POST /api/scan/item`: On-demand scan for a single episode (synchronous or background).
+- `POST /api/scan/stop`: Cancel active scan and clear queue.
+- `GET /api/segments`: Query detected intro/credit segments for an episode.
+- `GET /api/stats`: Aggregated media library statistics and total time saved.
+- `GET /api/logs`: View recent server logs in JSON or raw plain text.
 
 ---
 
