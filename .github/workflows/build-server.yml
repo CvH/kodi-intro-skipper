@@ -1,0 +1,75 @@
+name: Build IntroSkipper.Server (aarch64)
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '*'
+    paths:
+      - 'IntroSkipper/**'
+      - 'IntroSkipper.Server/**'
+      - 'IntroSkipper.sln'
+      - 'build.json'
+      - '.github/workflows/build-server.yml'
+  pull_request:
+    paths:
+      - 'IntroSkipper/**'
+      - 'IntroSkipper.Server/**'
+      - 'IntroSkipper.sln'
+      - 'build.json'
+      - '.github/workflows/build-server.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build linux-arm64
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Prepare build environment
+        run: |
+          # Stub web assets so WebBuild target skips pnpm when building standalone daemon
+          mkdir -p IntroSkipper/Configuration
+          touch IntroSkipper/Configuration/introskipper.js IntroSkipper/Configuration/introskipper.css
+
+      - name: Publish IntroSkipper.Server (aarch64 / linux-arm64)
+        run: |
+          dotnet publish IntroSkipper.Server/IntroSkipper.Server.csproj \
+            -c Release \
+            -r linux-arm64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:SkipWebBuild=true \
+            -o publish/linux-arm64
+
+      - name: Package server release
+        run: |
+          mkdir -p dist
+          chmod +x publish/linux-arm64/IntroSkipper.Server
+          # Clean build symbols from distribution bundle
+          rm -f publish/linux-arm64/*.pdb publish/linux-arm64/*.xml publish/linux-arm64/*.endpoints.json
+          # Archive as tar.gz (preserves unix permissions for LibreELEC / SBCs)
+          tar -czf dist/IntroSkipper.Server-linux-arm64.tar.gz -C publish/linux-arm64 .
+          # Archive as zip
+          cd publish/linux-arm64 && zip -r ../../dist/IntroSkipper.Server-linux-arm64.zip . && cd ../..
+          # Also place standalone binary directly in dist
+          cp publish/linux-arm64/IntroSkipper.Server dist/IntroSkipper.Server
+
+      - name: Upload server artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: IntroSkipper.Server-linux-arm64
+          path: |
+            dist/IntroSkipper.Server-linux-arm64.tar.gz
+            dist/IntroSkipper.Server-linux-arm64.zip
+            dist/IntroSkipper.Server
+          if-no-files-found: error

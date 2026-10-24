@@ -1,0 +1,54 @@
+name: Build Kodi Add-on
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '*'
+    paths:
+      - 'kodi-addon/**'
+      - '.github/workflows/kodi-addon.yml'
+  pull_request:
+    paths:
+      - 'kodi-addon/**'
+      - '.github/workflows/kodi-addon.yml'
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: Package Kodi Add-on
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Extract add-on version
+        id: version
+        run: |
+          ADDON_VERSION=$(sed -n 's/.*<addon.*version="\([^"]*\)".*/\1/p' kodi-addon/service.introskipper/addon.xml)
+          echo "version=${ADDON_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Detected Kodi add-on version: ${ADDON_VERSION}"
+
+      - name: Package add-on into zip
+        run: |
+          mkdir -p dist
+          cd kodi-addon
+          # Package with top-level folder 'service.introskipper' as required by Kodi
+          zip -r ../dist/service.introskipper-${{ steps.version.outputs.version }}.zip service.introskipper \
+            -x "*.pyc" "*/__pycache__/*" "*/.*"
+          cd ..
+          # Also provide addon.zip and service.introskipper.zip for generic links
+          cp dist/service.introskipper-${{ steps.version.outputs.version }}.zip dist/addon.zip
+          cp dist/service.introskipper-${{ steps.version.outputs.version }}.zip dist/service.introskipper.zip
+
+      - name: Upload add-on artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: kodi-addon-zip
+          path: |
+            dist/addon.zip
+            dist/service.introskipper.zip
+            dist/service.introskipper-*.zip
+          if-no-files-found: error
