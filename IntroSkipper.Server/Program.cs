@@ -7,6 +7,7 @@ using IntroSkipper.FFmpeg;
 using IntroSkipper.Server;
 using IntroSkipper.Server.Analysis;
 using IntroSkipper.Server.Kodi;
+using IntroSkipper.Server.Logging;
 using IntroSkipper.Server.Models;
 using IntroSkipper.Server.Scanning;
 using Microsoft.AspNetCore.Mvc;
@@ -43,6 +44,11 @@ if (!string.IsNullOrWhiteSpace(ffmpegPath))
     FFmpegService.CustomFFmpegPath = ffmpegPath;
 }
 
+// Ensure server.log is written to data directory or current working directory
+var logDir = dataDir ?? Directory.GetCurrentDirectory();
+var logPath = Path.Combine(logDir, "server.log");
+builder.Logging.AddProvider(new ServerFileLoggerProvider(logPath));
+
 // Ensure Kestrel listens on configured port if no urls specified
 if (builder.Configuration["urls"] is null && Environment.GetEnvironmentVariable("ASPNETCORE_URLS") is null)
 {
@@ -62,15 +68,22 @@ builder.Services.AddSingleton<IFFmpegService, FFmpegService>();
 builder.Services.AddSingleton<MediaScanner>();
 builder.Services.AddSingleton<MediaFileIndex>();
 builder.Services.AddSingleton(new PluginConfiguration());
+builder.Services.AddSingleton<ScanProgressTracker>();
 builder.Services.AddSingleton<StandaloneAnalyzer>();
 builder.Services.AddSingleton<AnalysisQueue>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AnalysisQueue>());
 
 var app = builder.Build();
 
-// Wire Kodi VFS path resolution into FFmpegService
+// Wire Kodi VFS path resolution and activity tracking into FFmpegService
 var kodiBridge = app.Services.GetRequiredService<KodiVfsBridge>();
 FFmpegService.PathResolver = kodiBridge.BuildVfsUrl;
+
+var progressTracker = app.Services.GetRequiredService<ScanProgressTracker>();
+FFmpegService.ActivityReporter = (path, activity) =>
+{
+    progressTracker.ReportActivity(path, activity);
+};
 
 // Initialize SQLite databases on startup
 using (var scope = app.Services.CreateScope())
@@ -87,12 +100,14 @@ app.MapGet("/api/status", async (
     ServerStorage storage,
     IFFmpegService ffmpeg,
     AnalysisQueue queue,
+    ScanProgressTracker tracker,
     KodiVfsBridge kodi,
     CancellationToken ct) =>
 {
     var valid = await ffmpeg.CheckFFmpegVersionAsync(ct).ConfigureAwait(false);
     var version = ffmpeg.GetCheckResult().Outputs.FirstOrDefault(o => o.Name == "version")?.Output.Split('\n')[0].Trim() ?? "unknown";
     var kodiConnected = await kodi.PingAsync(ct).ConfigureAwait(false);
+    var snapshot = tracker.GetSnapshot(queue.QueuedCount);
 
     return Results.Ok(new ServerStatusResponse(
         queue.Status,
@@ -102,8 +117,20 @@ app.MapGet("/api/status", async (
         version,
         valid,
         kodi.BaseUrl,
-        kodiConnected));
+        kodiConnected,
+        snapshot.IsScanning,
+        snapshot.CurrentFile,
+        snapshot.CurrentStage,
+        snapshot.FileIndex,
+        snapshot.TotalFiles));
 });
+
+// Currently scanned files & progress status endpoints
+app.MapGet("/api/scan/current", (ScanProgressTracker tracker, AnalysisQueue queue) =>
+    Results.Ok(tracker.GetSnapshot(queue.QueuedCount)));
+
+app.MapGet("/api/scan/status", (ScanProgressTracker tracker, AnalysisQueue queue) =>
+    Results.Ok(tracker.GetSnapshot(queue.QueuedCount)));
 
 // Segment query endpoint (used by Kodi addon)
 app.MapGet("/api/segments", async (
@@ -136,18 +163,30 @@ app.MapGet("/api/segments", async (
     return Results.Ok(response);
 });
 
-// Enqueue directory scan endpoint
-app.MapPost("/api/scan", (
+// Start scan endpoint
+var handleStartScan = (
     [FromBody] ScanRequest request,
     AnalysisQueue queue) =>
 {
-    if (string.IsNullOrWhiteSpace(request.Path) || (!Directory.Exists(request.Path) && !request.Path.Contains("://")))
+    if (string.IsNullOrWhiteSpace(request?.Path) || (!Directory.Exists(request.Path) && !request.Path.Contains("://")))
     {
         return Results.BadRequest(new { error = "Valid directory or network share path is required." });
     }
 
     queue.Enqueue(request.Path, request.ExportEdl);
-    return Results.Accepted("/api/status", new { message = "Scan enqueued", path = request.Path });
+    return Results.Accepted("/api/scan/status", new { message = "Scan enqueued", path = request.Path });
+};
+
+app.MapPost("/api/scan", handleStartScan);
+app.MapPost("/api/scan/start", handleStartScan);
+
+// Stop scan endpoint
+app.MapPost("/api/scan/stop", (AnalysisQueue queue) =>
+{
+    var stopped = queue.StopScan();
+    return Results.Ok(new StopScanResponse(
+        stopped ? "Scan stopped and queue cleared." : "No active scan was running.",
+        stopped));
 });
 
 // Minimal landing page
@@ -162,6 +201,7 @@ app.MapGet("/", (ServerStorage storage) => Results.Content(
         <ul>
             <li><strong>Database:</strong> {storage.SegmentDatabasePath}</li>
             <li><strong>Status:</strong> <a href="/api/status">/api/status</a></li>
+            <li><strong>Scan Progress:</strong> <a href="/api/scan/status">/api/scan/status</a></li>
             <li><strong>Segments API:</strong> <code>/api/segments?path=...&series=...&season=1&episode=1</code></li>
         </ul>
     </body>

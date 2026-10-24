@@ -29,11 +29,27 @@ public sealed record ServerStatusResponse(
     string FFmpegVersion,
     bool FFmpegValid,
     string? KodiVfsUrl = null,
-    bool KodiVfsConnected = false);
+    bool KodiVfsConnected = false,
+    bool IsScanning = false,
+    string? CurrentFile = null,
+    string? CurrentStage = null,
+    int? FileIndex = null,
+    int? TotalFiles = null);
 
 /// <summary>
 /// Request to scan and analyze a directory.
 /// </summary>
+/// <param name="Path">Directory or network share path to scan.</param>
+/// <param name="ExportEdl">Whether to generate EDL files alongside media.</param>
 public sealed record ScanRequest(
-    string Path,
+    string? Path = null,
     bool ExportEdl = false);
+
+/// <summary>
+/// Response returned from stopping an active scan.
+/// </summary>
+/// <param name="Message">Human-readable message.</param>
+/// <param name="Stopped">True if an active scan was stopped, false if already idle.</param>
+public sealed record StopScanResponse(
+    string Message,
+    bool Stopped);

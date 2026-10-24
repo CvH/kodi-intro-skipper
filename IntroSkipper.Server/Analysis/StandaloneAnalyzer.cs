@@ -22,7 +22,8 @@ public sealed class StandaloneAnalyzer(
     IFFmpegService ffmpegService,
     DetectionCacheService cacheService,
     IntroSkipperDatabase database,
-    PluginConfiguration config)
+    PluginConfiguration config,
+    ScanProgressTracker progressTracker)
 {
     private readonly ILogger<StandaloneAnalyzer> _logger = loggerFactory.CreateLogger<StandaloneAnalyzer>();
     private readonly ILoggerFactory _loggerFactory = loggerFactory;
@@ -30,6 +31,7 @@ public sealed class StandaloneAnalyzer(
     private readonly DetectionCacheService _cacheService = cacheService;
     private readonly IntroSkipperDatabase _database = database;
     private readonly PluginConfiguration _config = config;
+    private readonly ScanProgressTracker _progressTracker = progressTracker;
 
     /// <summary>
     /// Analyzes a season of episodes, detecting introduction and credit sequences.
@@ -60,9 +62,13 @@ public sealed class StandaloneAnalyzer(
         var seriesId = ItemIdGenerator.FromSeries(seriesName);
         var seasonId = ItemIdGenerator.FromSeason(seriesName, seasonNum);
 
-        foreach (var file in episodes.OrderBy(e => e.EpisodeNumber))
+        var orderedEpisodes = episodes.OrderBy(e => e.EpisodeNumber).ToList();
+        for (var i = 0; i < orderedEpisodes.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            var file = orderedEpisodes[i];
+            _progressTracker.UpdateFile(file.FilePath, seriesName, seasonNum, file.EpisodeNumber, "Probing media & chapters", i + 1, orderedEpisodes.Count);
 
             var episodeId = ItemIdGenerator.FromPath(file.FilePath);
             var (duration, chapters) = await ProbeMediaAsync(file.FilePath, episodeId, cancellationToken).ConfigureAwait(false);
@@ -105,6 +111,7 @@ public sealed class StandaloneAnalyzer(
         try
         {
             // 1. Chapter Analyzer for Intro
+            _progressTracker.UpdateStage("Chapter analysis");
             var chapterAnalyzer = new ChapterAnalyzer(
                 _loggerFactory.CreateLogger<ChapterAnalyzer>(),
                 _ffmpegService,
@@ -118,6 +125,7 @@ public sealed class StandaloneAnalyzer(
             // 2. Chromaprint Audio Fingerprint Analyzer for Intro (across the season)
             if (ffmpegValid && remainingIntro.Count > 0)
             {
+                _progressTracker.UpdateStage("Chromaprint audio fingerprinting");
                 var chromaprintAnalyzer = new ChromaprintAnalyzer(
                     _loggerFactory.CreateLogger<ChromaprintAnalyzer>(),
                     _ffmpegService,
@@ -129,10 +137,12 @@ public sealed class StandaloneAnalyzer(
             }
 
             // 3. Credits Pass (Keyframe Analyzer + Chapter combination)
+            _progressTracker.UpdateStage("Credits analysis (keyframe & black frame scan)");
             var creditsPass = new CreditsPass(_loggerFactory, _ffmpegService, _cacheService, _database, _config);
             await creditsPass.RunAsync(queuedEpisodes, AnalyzerAction.Default, ffmpegValid, cancellationToken).ConfigureAwait(false);
 
             // Mark analyzed items and optionally export EDL
+            _progressTracker.UpdateStage("Saving detected segments");
             await _database.MarkItemsAnalyzedAsync(
                 AnalysisMode.Introduction,
                 queuedEpisodes.Select(e => (e.EpisodeId, (long?)File.GetLastWriteTimeUtc(e.Path).Ticks)),
@@ -147,10 +157,18 @@ public sealed class StandaloneAnalyzer(
 
             if (exportEdl)
             {
+                _progressTracker.UpdateStage("Exporting EDL files");
                 foreach (var episode in queuedEpisodes)
                 {
                     await ExportEdlAsync(episode.EpisodeId, episode.Path, cancellationToken).ConfigureAwait(false);
                 }
+            }
+
+            for (var i = 0; i < queuedEpisodes.Count; i++)
+            {
+                var ep = queuedEpisodes[i];
+                var segments = await _database.GetSegmentsAsync(ep.EpisodeId, cancellationToken: cancellationToken).ConfigureAwait(false);
+                _progressTracker.CompleteFile(ep.Path, segments.Count);
             }
 
             _logger.LogInformation("Successfully analyzed {Series} Season {Season}", seriesName, seasonNum);

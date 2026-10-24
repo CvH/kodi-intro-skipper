@@ -156,6 +156,11 @@ internal sealed partial class FFmpegService : IFFmpegService
     /// </summary>
     internal static Func<string, string>? PathResolver { get; set; }
 
+    /// <summary>
+    /// Gets or sets an optional delegate to report active media analysis operations on a file.
+    /// </summary>
+    internal static Action<string, string>? ActivityReporter { get; set; }
+
     private static string FFmpegPath
     {
         get
@@ -295,6 +300,8 @@ internal sealed partial class FFmpegService : IFFmpegService
     /// <inheritdoc/>
     public async Task<KeyframePage[]> ScanKeyframesAsync(QueuedEpisode episode, int threshold, CancellationToken cancellationToken = default)
     {
+        ActivityReporter?.Invoke(episode.Path, "Keyframe scan for credits");
+
         // The black-frame scan goes first: on a cache miss its decode also writes the visuals row,
         // so the visuals read after it is a cache hit. Run concurrently, a miss would decode twice.
         var rows = await DetectBlackFramesAsync(episode, threshold, cancellationToken).ConfigureAwait(false);
@@ -631,6 +638,7 @@ internal sealed partial class FFmpegService : IFFmpegService
     public async Task<double?> ProbeAudioDurationAsync(string filePath, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ActivityReporter?.Invoke(filePath, "Probing audio duration");
 
         try
         {
@@ -712,6 +720,8 @@ internal sealed partial class FFmpegService : IFFmpegService
     /// <inheritdoc />
     public async Task<ChapterInfo[]?> GetEmbeddedChaptersAsync(QueuedEpisode episode, CancellationToken cancellationToken = default)
     {
+        ActivityReporter?.Invoke(episode.Path, "Probing embedded chapters");
+
         try
         {
             string[] args =
@@ -1305,6 +1315,7 @@ internal sealed partial class FFmpegService : IFFmpegService
     public async Task<uint[]> FingerprintAsync(QueuedEpisode episode, AnalysisMode mode, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ActivityReporter?.Invoke(episode.Path, $"Fingerprinting audio ({mode})");
 
         var cacheMode = QueuedEpisode.FingerprintCacheMode(mode);
         var (start, end) = episode.GetFingerprintRange(cacheMode);

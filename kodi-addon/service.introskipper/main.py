@@ -76,13 +76,56 @@ def fetch_server_status():
     return None
 
 
+def fetch_scan_progress():
+    server_url = get_server_url()
+    url = f"{server_url}/api/scan/status"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Kodi-IntroSkipper/1.0'})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            if resp.status == 200:
+                data = resp.read().decode('utf-8')
+                return json.loads(data)
+    except Exception as ex:
+        log(f"Failed to fetch scan progress from {url}: {ex}", xbmc.LOGDEBUG if xbmc else None)
+    return None
+
+
+def stop_scan():
+    server_url = get_server_url()
+    url = f"{server_url}/api/scan/stop"
+    try:
+        req = urllib.request.Request(
+            url,
+            data=b"{}",
+            headers={'Content-Type': 'application/json', 'User-Agent': 'Kodi-IntroSkipper/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status == 200:
+                data = resp.read().decode('utf-8')
+                res = json.loads(data)
+                msg = res.get('message', 'Scan stopped')
+                if xbmcgui:
+                    xbmcgui.Dialog().notification(ADDON_NAME, msg, xbmcgui.NOTIFICATION_INFO, 3000)
+                else:
+                    print(msg)
+                return True
+    except Exception as ex:
+        log(f"Failed to stop scan: {ex}", xbmc.LOGWARNING if xbmc else None)
+        if xbmcgui:
+            xbmcgui.Dialog().ok(ADDON_NAME, f"Failed to stop scan:\n{ex}")
+    return False
+
+
 def show_status():
     status = fetch_server_status()
     if status is None:
-        xbmcgui.Dialog().ok(
-            ADDON_NAME,
-            f"Could not connect to IntroSkipper server at:\n{get_server_url()}\n\nPlease verify that the server is running."
-        )
+        if xbmcgui:
+            xbmcgui.Dialog().ok(
+                ADDON_NAME,
+                f"Could not connect to IntroSkipper server at:\n{get_server_url()}\n\nPlease verify that the server is running."
+            )
+        else:
+            print("Could not connect to IntroSkipper server.")
         return
 
     st = status.get('status', 'Unknown')
@@ -90,12 +133,27 @@ def show_status():
     db_path = status.get('segmentDatabasePath', 'Unknown')
     ffmpeg_valid = "Yes" if status.get('fFmpegValid', False) else "No (Chromaprint missing!)"
     ffmpeg_ver = status.get('fFmpegVersion', 'Unknown')
+    is_scanning = status.get('isScanning', False)
+    curr_file = status.get('currentFile')
+    curr_stage = status.get('currentStage', 'Idle')
+    idx = status.get('fileIndex', 0)
+    tot = status.get('totalFiles', 0)
 
     enabled_paths = sources.get_enabled_paths()
     sources_summary = f"{len(enabled_paths)} enabled" if enabled_paths else "None (default: all disabled)"
 
+    scan_info = ""
+    if is_scanning:
+        fname = os.path.basename(curr_file) if curr_file else "None"
+        count_tag = f" [{idx}/{tot}]" if tot > 0 else ""
+        scan_info = (
+            f"\n[B]Active Scan:[/B] {curr_stage}\n"
+            f"[B]Current File{count_tag}:[/B] {fname}\n"
+        )
+
     msg = (
         f"[B]Server Status:[/B] {st}\n"
+        f"{scan_info}"
         f"[B]Queued Jobs:[/B] {queued}\n"
         f"[B]Configured Scan Paths:[/B] {sources_summary}\n"
         f"[B]Chromaprint / FFmpeg:[/B] {ffmpeg_valid}\n"
@@ -202,7 +260,7 @@ def trigger_scan():
         print(f"Triggering scan for {len(enabled_paths)} enabled source(s)...")
 
     server_url = get_server_url()
-    scan_url = f"{server_url}/api/scan"
+    scan_url = f"{server_url}/api/scan/start"
     success_count = 0
     failed_paths = []
 
@@ -264,37 +322,50 @@ def live_monitor():
 
     try:
         while not p_dialog.iscanceled():
-            status = fetch_server_status()
-            if status is None:
-                p_dialog.update(0, "Error: Could not reach IntroSkipper server\nReconnecting...")
-                time.sleep(2)
-                continue
+            progress = fetch_scan_progress()
+            if progress is None:
+                status = fetch_server_status()
+                if status is None:
+                    p_dialog.update(0, "Error: Could not reach IntroSkipper server\nReconnecting...")
+                    time.sleep(2)
+                    continue
+                is_scanning = status.get('isScanning', False)
+                current_file = status.get('currentFile', '')
+                current_stage = status.get('currentStage', status.get('status', 'Idle'))
+                file_index = status.get('fileIndex', 0)
+                total_files = status.get('totalFiles', 0)
+                queued = status.get('queuedJobs', 0)
+            else:
+                is_scanning = progress.get('isScanning', False)
+                current_file = progress.get('currentFile', '')
+                current_stage = progress.get('currentStage', 'Idle')
+                file_index = progress.get('fileIndex', 0)
+                total_files = progress.get('totalFiles', 0)
+                queued = progress.get('queuedJobs', 0)
 
-            current_status = status.get('status', 'Idle')
-            queued = status.get('queuedJobs', 0)
-
-            # Calculate progress percentage
-            percent = 0
-            if current_status == "Idle" and queued == 0:
+            if not is_scanning and queued == 0:
                 p_dialog.update(100, "Scan Complete!\nServer is Idle (0 queued jobs).")
                 time.sleep(2)
                 break
-            elif "Scanning" in current_status:
-                percent = 15
-            else:
-                m = re.search(r'season\s+(\d+)/(\d+)', current_status, re.IGNORECASE)
-                if m:
-                    idx = int(m.group(1))
-                    tot = int(m.group(2))
-                    percent = max(10, min(95, int((idx / max(1, tot)) * 100)))
-                else:
-                    percent = 50
 
-            line1 = f"Current Activity: {current_status}"
-            line2 = f"Queued jobs remaining: {queued}"
-            p_dialog.update(percent, f"{line1}\n{line2}")
+            percent = 0
+            if total_files > 0 and file_index > 0:
+                percent = max(5, min(95, int((file_index / total_files) * 100)))
+            elif is_scanning:
+                percent = 25
 
-            time.sleep(1.5)
+            file_name = os.path.basename(current_file) if current_file else "None"
+            file_count_str = f" [{file_index}/{total_files}]" if total_files > 0 else ""
+            line1 = f"Current File{file_count_str}: {file_name}"
+            line2 = f"Stage: {current_stage}"
+            line3 = f"Queued jobs remaining: {queued}"
+            p_dialog.update(percent, f"{line1}\n{line2}\n{line3}")
+
+            time.sleep(1.0)
+
+        if p_dialog.iscanceled():
+            if xbmcgui.Dialog().yesno(ADDON_NAME, "Stop the active scan on the server?"):
+                stop_scan()
     finally:
         p_dialog.close()
 
@@ -311,6 +382,9 @@ def main():
     elif arg == "scan":
         trigger_scan()
         return
+    elif arg == "stop":
+        stop_scan()
+        return
     elif arg == "monitor":
         live_monitor()
         return
@@ -319,6 +393,7 @@ def main():
     status = fetch_server_status()
     st_label = status.get('status', 'Offline') if status else "Offline"
     queued_label = f" ({status.get('queuedJobs', 0)} queued)" if status and status.get('queuedJobs', 0) > 0 else ""
+    is_scanning = status.get('isScanning', False) if status else False
 
     enabled_count = len(sources.get_enabled_paths())
     all_sources = sources.get_video_sources()
@@ -326,25 +401,45 @@ def main():
     options = [
         f"1. Current Status: [{st_label}{queued_label}]",
         f"2. Start Scan on Enabled Sources ({enabled_count} enabled)",
-        f"3. Configure Scan Sources ({enabled_count}/{len(all_sources)} enabled)...",
-        "4. Live Scan Monitor",
-        "5. Add-on Settings..."
     ]
 
+    action_map = {0: "status", 1: "scan"}
+    next_idx = 2
+
+    if is_scanning:
+        options.append("3. Stop Active Scan")
+        action_map[next_idx] = "stop"
+        next_idx += 1
+
+    options.append(f"{next_idx + 1}. Configure Scan Sources ({enabled_count}/{len(all_sources)} enabled)...")
+    action_map[next_idx] = "sources"
+    next_idx += 1
+
+    options.append(f"{next_idx + 1}. Live Scan Monitor")
+    action_map[next_idx] = "monitor"
+    next_idx += 1
+
+    options.append(f"{next_idx + 1}. Add-on Settings...")
+    action_map[next_idx] = "settings"
+
     choice = xbmcgui.Dialog().select("Intro Skipper", options)
-    if choice == 0:
-        show_status()
-    elif choice == 1:
-        trigger_scan()
-    elif choice == 2:
-        manage_sources()
-    elif choice == 3:
-        live_monitor()
-    elif choice == 4:
-        if ADDON:
-            ADDON.openSettings()
+    if choice in action_map:
+        action = action_map[choice]
+        if action == "status":
+            show_status()
+        elif action == "scan":
+            trigger_scan()
+        elif action == "stop":
+            if xbmcgui.Dialog().yesno(ADDON_NAME, "Are you sure you want to stop the active scan?"):
+                stop_scan()
+        elif action == "sources":
+            manage_sources()
+        elif action == "monitor":
+            live_monitor()
+        elif action == "settings":
+            if ADDON:
+                ADDON.openSettings()
 
 
 if __name__ == '__main__':
     main()
-

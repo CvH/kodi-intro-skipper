@@ -15,6 +15,7 @@ public sealed class AnalysisQueue(
     MediaScanner scanner,
     MediaFileIndex fileIndex,
     StandaloneAnalyzer analyzer,
+    ScanProgressTracker progressTracker,
     ILogger<AnalysisQueue> logger) : BackgroundService
 {
     private readonly Channel<ScanJob> _channel = Channel.CreateUnbounded<ScanJob>(new UnboundedChannelOptions
@@ -26,6 +27,8 @@ public sealed class AnalysisQueue(
     private readonly Lock _lock = new();
     private string _currentStatus = "Idle";
     private int _queuedCount;
+    private bool _isScanning;
+    private CancellationTokenSource? _activeJobCts;
 
     /// <summary>
     /// Gets the current status of the background analysis worker.
@@ -63,6 +66,20 @@ public sealed class AnalysisQueue(
     }
 
     /// <summary>
+    /// Gets a value indicating whether a scan is currently active.
+    /// </summary>
+    public bool IsScanning
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _isScanning;
+            }
+        }
+    }
+
+    /// <summary>
     /// Enqueues a folder for scanning and analysis.
     /// </summary>
     /// <param name="folderPath">Directory to scan.</param>
@@ -76,6 +93,41 @@ public sealed class AnalysisQueue(
 
         _channel.Writer.TryWrite(new ScanJob(folderPath, exportEdl));
         logger.LogInformation("Enqueued scan for {Path}", folderPath);
+    }
+
+    /// <summary>
+    /// Stops the currently running scan job immediately and clears all pending jobs in the queue.
+    /// </summary>
+    /// <returns>True if an active or queued scan was stopped, false if already idle.</returns>
+    public bool StopScan()
+    {
+        lock (_lock)
+        {
+            if (!_isScanning && _queuedCount == 0)
+            {
+                return false;
+            }
+
+            logger.LogInformation(">>> Stopping active scan and draining pending queue...");
+
+            try
+            {
+                _activeJobCts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            while (_channel.Reader.TryRead(out _))
+            {
+            }
+
+            _queuedCount = 0;
+            _isScanning = false;
+            _currentStatus = "Stopped";
+            progressTracker.FinishScan("Stopped");
+            return true;
+        }
     }
 
     /// <inheritdoc/>
@@ -92,6 +144,7 @@ public sealed class AnalysisQueue(
                 lock (_lock)
                 {
                     _queuedCount = Math.Max(0, _queuedCount - 1);
+                    _isScanning = true;
                 }
             }
             catch (OperationCanceledException)
@@ -99,10 +152,18 @@ public sealed class AnalysisQueue(
                 break;
             }
 
+            using var jobCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            lock (_lock)
+            {
+                _activeJobCts = jobCts;
+            }
+
             try
             {
                 Status = $"Scanning: {job.FolderPath}";
-                var episodes = await scanner.ScanDirectoryAsync(job.FolderPath, stoppingToken).ConfigureAwait(false);
+                progressTracker.StartScan(job.FolderPath);
+
+                var episodes = await scanner.ScanDirectoryAsync(job.FolderPath, jobCts.Token).ConfigureAwait(false);
 
                 foreach (var ep in episodes)
                 {
@@ -115,20 +176,33 @@ public sealed class AnalysisQueue(
                 var index = 1;
                 foreach (var seasonGroup in seasons)
                 {
-                    stoppingToken.ThrowIfCancellationRequested();
+                    jobCts.Token.ThrowIfCancellationRequested();
                     Status = $"Analyzing season {index}/{seasons.Count}: {seasonGroup.Key.SeriesName} S{seasonGroup.Key.SeasonNumber}";
 
-                    await analyzer.AnalyzeSeasonAsync([.. seasonGroup], job.ExportEdl, stoppingToken).ConfigureAwait(false);
+                    await analyzer.AnalyzeSeasonAsync([.. seasonGroup], job.ExportEdl, jobCts.Token).ConfigureAwait(false);
                     index++;
                 }
+
+                progressTracker.FinishScan("Idle");
+            }
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+            {
+                logger.LogInformation(">>> Scan for {Path} was stopped by user request", job.FolderPath);
+                progressTracker.FinishScan("Stopped");
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Error processing scan job for {Path}", job.FolderPath);
+                progressTracker.FinishScan("Error");
             }
             finally
             {
-                Status = "Idle";
+                lock (_lock)
+                {
+                    _activeJobCts = null;
+                    _isScanning = false;
+                    Status = "Idle";
+                }
             }
         }
 
