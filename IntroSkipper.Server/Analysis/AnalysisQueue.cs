@@ -102,7 +102,7 @@ public sealed class AnalysisQueue(
             try
             {
                 Status = $"Scanning: {job.FolderPath}";
-                var episodes = scanner.ScanDirectory(job.FolderPath);
+                var episodes = await scanner.ScanDirectoryAsync(job.FolderPath, stoppingToken).ConfigureAwait(false);
 
                 foreach (var ep in episodes)
                 {

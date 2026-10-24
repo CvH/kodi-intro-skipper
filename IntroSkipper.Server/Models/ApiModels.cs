@@ -27,7 +27,9 @@ public sealed record ServerStatusResponse(
     string DataDirectory,
     string SegmentDatabasePath,
     string FFmpegVersion,
-    bool FFmpegValid);
+    bool FFmpegValid,
+    string? KodiVfsUrl = null,
+    bool KodiVfsConnected = false);
 
 /// <summary>
 /// Request to scan and analyze a directory.

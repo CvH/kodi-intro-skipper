@@ -6,6 +6,7 @@ using IntroSkipper.Data;
 using IntroSkipper.FFmpeg;
 using IntroSkipper.Server;
 using IntroSkipper.Server.Analysis;
+using IntroSkipper.Server.Kodi;
 using IntroSkipper.Server.Models;
 using IntroSkipper.Server.Scanning;
 using Microsoft.AspNetCore.Mvc;
@@ -56,6 +57,7 @@ builder.Services.AddSingleton(sp => new DetectionCacheService(
     sp.GetRequiredService<ILogger<DetectionCacheService>>(),
     sp.GetRequiredService<ServerStorage>().CacheDatabase));
 
+builder.Services.AddSingleton<KodiVfsBridge>();
 builder.Services.AddSingleton<IFFmpegService, FFmpegService>();
 builder.Services.AddSingleton<MediaScanner>();
 builder.Services.AddSingleton<MediaFileIndex>();
@@ -65,6 +67,10 @@ builder.Services.AddSingleton<AnalysisQueue>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AnalysisQueue>());
 
 var app = builder.Build();
+
+// Wire Kodi VFS path resolution into FFmpegService
+var kodiBridge = app.Services.GetRequiredService<KodiVfsBridge>();
+FFmpegService.PathResolver = kodiBridge.BuildVfsUrl;
 
 // Initialize SQLite databases on startup
 using (var scope = app.Services.CreateScope())
@@ -81,10 +87,12 @@ app.MapGet("/api/status", async (
     ServerStorage storage,
     IFFmpegService ffmpeg,
     AnalysisQueue queue,
+    KodiVfsBridge kodi,
     CancellationToken ct) =>
 {
     var valid = await ffmpeg.CheckFFmpegVersionAsync(ct).ConfigureAwait(false);
     var version = ffmpeg.GetCheckResult().Outputs.FirstOrDefault(o => o.Name == "version")?.Output.Split('\n')[0].Trim() ?? "unknown";
+    var kodiConnected = await kodi.PingAsync(ct).ConfigureAwait(false);
 
     return Results.Ok(new ServerStatusResponse(
         queue.Status,
@@ -92,7 +100,9 @@ app.MapGet("/api/status", async (
         storage.DataDirectory,
         storage.SegmentDatabasePath,
         version,
-        valid));
+        valid,
+        kodi.BaseUrl,
+        kodiConnected));
 });
 
 // Segment query endpoint (used by Kodi addon)
@@ -131,9 +141,9 @@ app.MapPost("/api/scan", (
     [FromBody] ScanRequest request,
     AnalysisQueue queue) =>
 {
-    if (string.IsNullOrWhiteSpace(request.Path) || !Directory.Exists(request.Path))
+    if (string.IsNullOrWhiteSpace(request.Path) || (!Directory.Exists(request.Path) && !request.Path.Contains("://")))
     {
-        return Results.BadRequest(new { error = "Valid directory path is required." });
+        return Results.BadRequest(new { error = "Valid directory or network share path is required." });
     }
 
     queue.Enqueue(request.Path, request.ExportEdl);

@@ -5,12 +5,14 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 
+using IntroSkipper.Server.Kodi;
+
 namespace IntroSkipper.Server.Scanning;
 
 /// <summary>
-/// Discovers media files on the filesystem and parses them into series and season structures.
+/// Discovers media files on the filesystem or via Kodi VFS and parses them into series and season structures.
 /// </summary>
-public sealed partial class MediaScanner(ILogger<MediaScanner> logger)
+public sealed partial class MediaScanner(ILogger<MediaScanner> logger, KodiVfsBridge kodiBridge)
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -33,7 +35,24 @@ public sealed partial class MediaScanner(ILogger<MediaScanner> logger)
     private static partial Regex NumericEpisodePattern();
 
     /// <summary>
-    /// Scans a directory recursively for video files and parses their episode information.
+    /// Scans a directory or network share path for video files, using Kodi JSON-RPC for remote paths
+    /// or local filesystem enumeration for local directories.
+    /// </summary>
+    /// <param name="directoryPath">Directory path or network URI (e.g. smb://).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of parsed episode information records.</returns>
+    public async Task<IReadOnlyList<ParsedEpisodeInfo>> ScanDirectoryAsync(string directoryPath, CancellationToken cancellationToken = default)
+    {
+        if (directoryPath.Contains("://"))
+        {
+            return await kodiBridge.DiscoverEpisodesAsync(directoryPath, this, cancellationToken).ConfigureAwait(false);
+        }
+
+        return ScanDirectory(directoryPath);
+    }
+
+    /// <summary>
+    /// Scans a local directory recursively for video files and parses their episode information.
     /// </summary>
     /// <param name="directoryPath">Directory path to scan.</param>
     /// <returns>A list of parsed episode information records.</returns>

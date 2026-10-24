@@ -18,7 +18,9 @@ public static class ItemIdGenerator
     /// <returns>A deterministic GUID.</returns>
     public static Guid FromPath(string filePath)
     {
-        var normalized = Path.GetFullPath(filePath).Trim().ToLowerInvariant().Replace('\\', '/');
+        var normalized = filePath.Contains("://")
+            ? filePath.Trim().ToLowerInvariant().Replace('\\', '/')
+            : Path.GetFullPath(filePath).Trim().ToLowerInvariant().Replace('\\', '/');
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(normalized));
         return new Guid(hash.AsSpan(0, 16));
     }

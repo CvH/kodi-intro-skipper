@@ -150,6 +150,12 @@ internal sealed partial class FFmpegService : IFFmpegService
     /// </summary>
     internal static string? CustomFFmpegPath { get; set; }
 
+    /// <summary>
+    /// Gets or sets an optional delegate to resolve media file paths before passing them to FFmpeg or FFprobe.
+    /// Used by the standalone server to bridge network URLs (e.g. smb://, nfs://) through Kodi's VFS HTTP gateway.
+    /// </summary>
+    internal static Func<string, string>? PathResolver { get; set; }
+
     private static string FFmpegPath
     {
         get
@@ -173,6 +179,8 @@ internal sealed partial class FFmpegService : IFFmpegService
             return "ffmpeg";
         }
     }
+
+    internal static string ResolveInputPath(string path) => PathResolver?.Invoke(path) ?? path;
 
     /// <inheritdoc/>
     public Task<bool> CheckFFmpegVersionAsync(CancellationToken cancellationToken = default)
@@ -242,7 +250,7 @@ internal sealed partial class FFmpegService : IFFmpegService
         [
             "-vn", "-sn", "-dn",
             "-ss", range.Start.ToString(CultureInfo.InvariantCulture),
-            "-i", episode.Path,
+            "-i", ResolveInputPath(episode.Path),
             "-to", range.Duration.ToString(CultureInfo.InvariantCulture),
             "-af", $"silencedetect=noise={noise}dB:duration=0.1",
             "-f", "null", "-",
@@ -273,7 +281,7 @@ internal sealed partial class FFmpegService : IFFmpegService
         string[] args =
         [
             "-ss", range.Start.ToString(CultureInfo.InvariantCulture),
-            "-i", episode.Path,
+            "-i", ResolveInputPath(episode.Path),
             "-to", range.Duration.ToString(CultureInfo.InvariantCulture),
             "-an", "-dn", "-sn",
             "-vf", $"blackframe=amount={amount}:threshold={threshold}",
@@ -401,7 +409,7 @@ internal sealed partial class FFmpegService : IFFmpegService
         "-skip_frame", "nokey",
         .. codec == "hevc" ? HevcKeyframeThreads : [],
         "-ss", start.ToString(CultureInfo.InvariantCulture),
-        "-i", path,
+        "-i", ResolveInputPath(path),
     ];
 
     // A keyframe-only decode's filters, behind a keyframe select for VP9.
@@ -417,7 +425,7 @@ internal sealed partial class FFmpegService : IFFmpegService
         [
             "-ss", FormatSeconds(window.Start),
             "-t", FormatSeconds(window.Duration),
-            "-i", episode.Path,
+            "-i", ResolveInputPath(episode.Path),
             .. OutputArgs(KeyframeVisualFilters),
         ];
 
@@ -469,7 +477,7 @@ internal sealed partial class FFmpegService : IFFmpegService
         [
             "-ss", range.Start.ToString(CultureInfo.InvariantCulture),
             "-skip_frame", "noref",
-            "-i", episode.Path,
+            "-i", ResolveInputPath(episode.Path),
             "-to", range.Duration.ToString(CultureInfo.InvariantCulture),
             "-an", "-dn", "-sn",
             "-vf", $"blackdetect=d={minimumDuration}:pix_th={pixelThreshold}:pic_th={pictureRatioThreshold}",
@@ -633,7 +641,7 @@ internal sealed partial class FFmpegService : IFFmpegService
                 "-select_streams", "a:0",
                 "-show_entries", "stream=duration:stream_tags=DURATION:format=duration",
                 "-of", "csv=p=0",
-                filePath,
+                ResolveInputPath(filePath),
             ];
 
             var output = Encoding.UTF8.GetString(await _processRunner.RunAsync(ffprobePath, args, stderr: false, timeout: 10 * 1000, cancellationToken: cancellationToken).ConfigureAwait(false)).Trim();
@@ -711,7 +719,7 @@ internal sealed partial class FFmpegService : IFFmpegService
                 "-v", "error",
                 "-show_chapters",
                 "-of", "json",
-                episode.Path,
+                ResolveInputPath(episode.Path),
             ];
 
             var capture = await _processRunner.RunCapturedAsync(
@@ -869,7 +877,7 @@ internal sealed partial class FFmpegService : IFFmpegService
             "-select_streams", "s",
             "-show_entries", "stream=index,codec_name:stream_tags=language:format=format_name,start_time",
             "-of", "compact=p=1:nk=1",
-            path,
+            ResolveInputPath(path),
         ];
         ProcessCapture capture;
         try
@@ -902,7 +910,7 @@ internal sealed partial class FFmpegService : IFFmpegService
     private static async Task<string> WriteHeadListAsync(string path, double outpoint, string listPrefix, CancellationToken cancellationToken)
     {
         var list = listPrefix + ".ffconcat";
-        var quoted = path.Replace("'", @"'\''", StringComparison.Ordinal);
+        var quoted = ResolveInputPath(path).Replace("'", @"'\''", StringComparison.Ordinal);
         await File.WriteAllTextAsync(
             list,
             FormattableString.Invariant($"ffconcat version 1.0\nfile '{quoted}'\noutpoint {FormatSeconds(outpoint)}\n"),
@@ -962,7 +970,7 @@ internal sealed partial class FFmpegService : IFFmpegService
                 args.AddRange(["-f", "concat", "-safe", "0", "-auto_convert", "0"]);
             }
 
-            args.AddRange(["-i", input.Path]);
+            args.AddRange(["-i", ResolveInputPath(input.Path)]);
         }
 
         List<(SubtitleInput Input, int Stream)> outputs = [];
@@ -1110,7 +1118,7 @@ internal sealed partial class FFmpegService : IFFmpegService
     // every frame as a keyframe.
     private async Task<string?> ProbeVideoCodecAsync(string filePath, CancellationToken cancellationToken)
     {
-        string[] args = ["-i", filePath, "-an", "-dn", "-sn", "-frames:v", "0", "-f", "null", "-"];
+        string[] args = ["-i", ResolveInputPath(filePath), "-an", "-dn", "-sn", "-frames:v", "0", "-f", "null", "-"];
 
         // The mapping block follows the input dump, which prints every metadata tag, so the
         // capture is capped rather than buffered whole.
@@ -1219,7 +1227,7 @@ internal sealed partial class FFmpegService : IFFmpegService
                 "-select_streams", "a",
                 "-show_entries", "stream=index,channels:stream_tags=language:stream_disposition=default",
                 "-of", "json",
-                filePath,
+                ResolveInputPath(filePath),
             ];
 
             var output = Encoding.UTF8.GetString(await _processRunner.RunAsync(
@@ -1338,7 +1346,7 @@ internal sealed partial class FFmpegService : IFFmpegService
         var args = new List<string>
         {
             "-ss", start.ToString(CultureInfo.InvariantCulture),
-            "-i", episode.Path,
+            "-i", ResolveInputPath(episode.Path),
             "-to", (end - start).ToString(CultureInfo.InvariantCulture),
         };
 
