@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings version="1">
+  <section id="service.introskipper">
+    <category id="connection" label="30000">
+      <group id="1">
+        <setting id="server_url" type="string" label="30001" help="30002">
+          <default>http://127.0.0.1:8037</default>
+        </setting>
+        <setting id="request_timeout" type="integer" label="30003" help="30004">
+          <level>0</level>
+          <default>3</default>
+          <constraints>
+            <minimum>1</minimum>
+            <maximum>10</maximum>
+            <step>1</step>
+          </constraints>
+        </setting>
+      </group>
+    </category>
+
+    <category id="behavior" label="30010">
+      <group id="1">
+        <setting id="intro_action" type="string" label="30011">
+          <level>0</level>
+          <default>prompt</default>
+          <constraints>
+            <options>
+              <option label="30012">prompt</option>
+              <option label="30013">autoskip</option>
+              <option label="30014">disabled</option>
+            </options>
+          </constraints>
+        </setting>
+        <setting id="intro_prompt_duration" type="integer" label="30015">
+          <level>0</level>
+          <default>6</default>
+          <constraints>
+            <minimum>3</minimum>
+            <maximum>15</maximum>
+            <step>1</step>
+          </constraints>
+          <dependencies>
+            <dependency type="visible">
+              <condition on="intro_action" operator="is">prompt</condition>
+            </dependency>
+          </dependencies>
+        </setting>
+      </group>
+
+      <group id="2">
+        <setting id="credits_action" type="string" label="30020">
+          <level>0</level>
+          <default>prompt</default>
+          <constraints>
+            <options>
+              <option label="30012">prompt</option>
+              <option label="30013">autoskip</option>
+              <option label="30021">next_episode</option>
+              <option label="30014">disabled</option>
+            </options>
+          </constraints>
+        </setting>
+        <setting id="credits_prompt_duration" type="integer" label="30022">
+          <level>0</level>
+          <default>8</default>
+          <constraints>
+            <minimum>3</minimum>
+            <maximum>20</maximum>
+            <step>1</step>
+          </constraints>
+          <dependencies>
+            <dependency type="visible">
+              <condition on="credits_action" operator="is">prompt</condition>
+            </dependency>
+          </dependencies>
+        </setting>
+      </group>
+    </category>
+
+    <category id="path_mapping" label="30030">
+      <group id="1">
+        <setting id="path_prefix_client" type="string" label="30031" help="30032">
+          <default></default>
+        </setting>
+        <setting id="path_prefix_server" type="string" label="30033" help="30034">
+          <default></default>
+        </setting>
+      </group>
+    </category>
+  </section>
+</settings>
