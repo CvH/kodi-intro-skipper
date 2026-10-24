@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
 import json
+import math
+import os
 import time
 import urllib.parse
 import urllib.request
@@ -14,9 +16,16 @@ ADDON_ID = 'service.introskipper'
 try:
     ADDON = xbmcaddon.Addon(ADDON_ID)
     ADDON_NAME = ADDON.getAddonInfo('name')
+    ADDON_PATH = ADDON.getAddonInfo('path')
 except Exception:
     ADDON = None
     ADDON_NAME = "Intro Skipper"
+    ADDON_PATH = os.path.dirname(os.path.abspath(__file__))
+
+MEDIA_DIR = os.path.join(ADDON_PATH, 'resources', 'media')
+RING_DIR = os.path.join(MEDIA_DIR, 'ring')
+BUTTON_FOCUS_TEX = os.path.join(MEDIA_DIR, 'button_focus.png')
+BUTTON_NOFOCUS_TEX = os.path.join(MEDIA_DIR, 'button_nofocus.png')
 
 
 def log(msg, level=xbmc.LOGINFO):
@@ -88,30 +97,82 @@ def get_credits_action():
 class SkipOverlay(xbmcgui.WindowDialog):
     """
     Non-blocking on-screen Skip button overlay displayed during intro / credits scenes.
+    Renders an animated circular countdown ring and remaining seconds inside the button pill.
     Allows the user to press Select / OK on their remote, or click with a mouse, to skip.
     Pressing Back / Dismiss hides the button for this scene.
     """
-    def __init__(self, title, seek_target, duration=None, notify_text="", on_skip=None):
+    def __init__(self, title, start, end, duration=None, notify_text="", on_skip=None):
         super().__init__()
-        self.seek_target = seek_target
-        # If duration > 0, set wall-clock expiration; if None or <= 0, stay visible as long as the segment runs
+        self.title = title
+        self.start = float(start)
+        self.end = float(end)
+        self.seek_target = float(end)
+        self.total_span = max(1.0, self.end - self.start)
         self.expires_at = (time.time() + duration) if (duration is not None and duration > 0) else None
         self.notify_text = notify_text
         self.on_skip = on_skip
         self.action_taken = None
         self.is_active = True
+        self.last_frame = -1
+        self.last_sec = -1
 
-        # In standard 1280x720 reference grid:
-        # Position button at bottom-right (x: 940, y: 600, w: 280, h: 60)
+        # Position button in bottom right corner (1280x720 canvas)
+        # width: 330, height: 56, right margin: 50, bottom margin: 50
+        btn_w = 330
+        btn_h = 56
+        x = 1280 - btn_w - 50
+        y = 720 - btn_h - 50
+
+        # Check for custom button textures
+        focus_tex = BUTTON_FOCUS_TEX if os.path.exists(BUTTON_FOCUS_TEX) else ""
+        nofocus_tex = BUTTON_NOFOCUS_TEX if os.path.exists(BUTTON_NOFOCUS_TEX) else ""
+
         self.btn = xbmcgui.ControlButton(
-            940, 600, 280, 60,
-            f"{title} >>",
-            alignment=6,
+            x, y, btn_w, btn_h,
+            "",
+            focusTexture=focus_tex,
+            noFocusTexture=nofocus_tex,
+            alignment=4,  # Left-aligned, vertically centered
             textColor="0xFFFFFFFF",
-            focusedColor="0xFF111111"
+            focusedColor="0xFFFFFFFF"
         )
         self.addControl(self.btn)
+
+        # Circle countdown ring image positioned inside the button on the left
+        circle_size = 32
+        circle_x = x + 16
+        circle_y = y + (btn_h - circle_size) // 2
+        initial_ring = os.path.join(RING_DIR, "ring_36.png") if os.path.exists(RING_DIR) else ""
+        self.circle_img = xbmcgui.ControlImage(
+            circle_x, circle_y, circle_size, circle_size,
+            initial_ring
+        )
+        self.addControl(self.circle_img)
+
         self.setFocus(self.btn)
+        # Initialize label and ring frame for the initial start position
+        self.update_playback(self.start)
+
+    def update_playback(self, current_time):
+        if not self.is_active:
+            return
+
+        remaining = max(0.0, self.end - current_time)
+        remaining_sec = int(math.ceil(remaining))
+        fraction = max(0.0, min(1.0, remaining / self.total_span))
+
+        # Update remaining seconds text on button
+        if remaining_sec != self.last_sec:
+            self.last_sec = remaining_sec
+            self.btn.setLabel(f"           {remaining_sec}s   {self.title} >>")
+
+        # Update circular progress ring frame (starts 100% full circle -> 0% empty circle)
+        frame_idx = int(round(fraction * 36))
+        if frame_idx != self.last_frame:
+            self.last_frame = frame_idx
+            ring_file = os.path.join(RING_DIR, f"ring_{frame_idx:02d}.png")
+            if os.path.exists(ring_file):
+                self.circle_img.setImage(ring_file)
 
     def trigger_skip(self):
         if not self.is_active:
@@ -268,7 +329,8 @@ class IntroSkipperPlayer(xbmc.Player):
                 self.cleanup_dialog()
                 return
 
-            # Dialog is actively showing; wait for user interaction or segment end
+            # Update spinning circle and remaining time countdown
+            self.current_dialog.update_playback(current_time)
             return
 
         # Reset handled state if the user seeks backwards before a segment start
@@ -320,6 +382,7 @@ class IntroSkipperPlayer(xbmc.Player):
                     log(f"Displaying on-screen skip button for {seg_type} (active until {end:.1f}s)")
                     self.current_dialog = SkipOverlay(
                         title,
+                        start,
                         end,
                         duration=duration,
                         notify_text=notify,
