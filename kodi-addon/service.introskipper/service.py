@@ -91,10 +91,11 @@ class SkipOverlay(xbmcgui.WindowDialog):
     Allows the user to press Select / OK on their remote, or click with a mouse, to skip.
     Pressing Back / Dismiss hides the button for this scene.
     """
-    def __init__(self, title, seek_target, duration=6, notify_text="", on_skip=None):
+    def __init__(self, title, seek_target, duration=None, notify_text="", on_skip=None):
         super().__init__()
         self.seek_target = seek_target
-        self.expires_at = time.time() + max(1, duration)
+        # If duration > 0, set wall-clock expiration; if None or <= 0, stay visible as long as the segment runs
+        self.expires_at = (time.time() + duration) if (duration is not None and duration > 0) else None
         self.notify_text = notify_text
         self.on_skip = on_skip
         self.action_taken = None
@@ -254,13 +255,28 @@ class IntroSkipperPlayer(xbmc.Player):
             if not self.current_dialog.is_active:
                 self.current_dialog = None
                 return
-            # Check if prompt duration expired or playback passed the segment
-            if time.time() >= self.current_dialog.expires_at or current_time >= self.current_dialog.seek_target:
-                log("Skip prompt expired or playback passed segment, closing overlay")
+
+            # Close overlay if playback has passed the segment end
+            if current_time >= self.current_dialog.seek_target:
+                log(f"Playback passed segment end ({self.current_dialog.seek_target:.1f}s), closing overlay")
                 self.cleanup_dialog()
                 return
-            # Dialog is actively showing; wait for user interaction or expiration
+
+            # Check if optional wall-clock duration expired
+            if self.current_dialog.expires_at is not None and time.time() >= self.current_dialog.expires_at:
+                log("Skip prompt duration expired, closing overlay")
+                self.cleanup_dialog()
+                return
+
+            # Dialog is actively showing; wait for user interaction or segment end
             return
+
+        # Reset handled state if the user seeks backwards before a segment start
+        for seg in self.active_segments:
+            seg_id = seg.get('id', '')
+            start = float(seg.get('start', 0.0))
+            if current_time < start - 1.0 and seg_id in self.handled_segments:
+                self.handled_segments.remove(seg_id)
 
         # 2. Check unhandled segments against current playback time
         for seg in self.active_segments:
@@ -278,7 +294,8 @@ class IntroSkipperPlayer(xbmc.Player):
 
                 if seg_type == 'Introduction':
                     action = get_intro_action()
-                    duration = get_setting_int('intro_prompt_duration', 6)
+                    # The intro skip button is displayed for the entire duration of the intro
+                    duration = None
                     title = get_localized_string(30050, "Skip Intro")
                     notify = get_localized_string(30052, "Intro skipped")
                 elif seg_type == 'Credits':
@@ -300,7 +317,7 @@ class IntroSkipperPlayer(xbmc.Player):
                     log(f"Action for {seg_type} is next_episode: playing next")
                     xbmc.executebuiltin("PlayerControl(Next)")
                 elif action == 'prompt':
-                    log(f"Displaying on-screen skip button for {seg_type} (duration={duration}s, target={end:.1f}s)")
+                    log(f"Displaying on-screen skip button for {seg_type} (active until {end:.1f}s)")
                     self.current_dialog = SkipOverlay(
                         title,
                         end,
