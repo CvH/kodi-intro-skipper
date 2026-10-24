@@ -8,4 +8,3 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("IntroSkipper.Tests")]
 [assembly: InternalsVisibleTo("CreditsRunner")]
 [assembly: InternalsVisibleTo("IntroSkipper.Server")]
-
