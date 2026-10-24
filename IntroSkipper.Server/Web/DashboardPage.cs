@@ -553,6 +553,7 @@ public static class DashboardPage
           <div>
             <div class="card-title">📂 Configured Media Sources</div>
             <div class="card-desc">Folders and network shares scanned for intro &amp; credit detection</div>
+          </div>
           <div style="display: flex; gap: 8px;">
             <button id="syncKodiSourcesBtn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 14px;" title="Fetch latest sources from Kodi">🔄 Sync from Kodi</button>
             <button id="scanAllSourcesBtn" class="btn btn-primary" style="font-size: 0.85rem; padding: 6px 14px;">▶ Scan All Enabled</button>
