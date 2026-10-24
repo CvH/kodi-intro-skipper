@@ -81,3 +81,40 @@ msgstr ""
 msgctxt "#30034"
 msgid "Path prefix as seen by the server (e.g. /mnt/media/tv/)"
 msgstr ""
+
+msgctxt "#30040"
+msgid "Scan Management"
+msgstr ""
+
+msgctxt "#30041"
+msgid "Configure Sources to Scan..."
+msgstr ""
+
+msgctxt "#30042"
+msgid "Select which video sources from sources.xml should be scanned for intros"
+msgstr ""
+
+msgctxt "#30043"
+msgid "Start Scan on Enabled Sources"
+msgstr ""
+
+msgctxt "#30044"
+msgid "Triggers analysis on the IntroSkipper server for all enabled sources"
+msgstr ""
+
+msgctxt "#30045"
+msgid "Check Server & Scan Status"
+msgstr ""
+
+msgctxt "#30046"
+msgid "Shows current scan progress, queue state, and database information"
+msgstr ""
+
+msgctxt "#30047"
+msgid "Open Live Scan Monitor"
+msgstr ""
+
+msgctxt "#30048"
+msgid "Displays a live progress window tracking the server's scan status"
+msgstr ""
+

@@ -2,6 +2,7 @@ bin/
 obj/
 BenchmarkDotNet.Artifacts/
 /package/
+publish/
 *.lscache
 
 # Web dashboard build output (built from web/ source)

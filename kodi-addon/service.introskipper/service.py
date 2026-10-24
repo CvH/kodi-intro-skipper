@@ -10,9 +10,13 @@ import xbmc
 import xbmcaddon
 import xbmcgui
 
-ADDON = xbmcaddon.Addon()
-ADDON_ID = ADDON.getAddonInfo('id')
-ADDON_NAME = ADDON.getAddonInfo('name')
+ADDON_ID = 'service.introskipper'
+try:
+    ADDON = xbmcaddon.Addon(ADDON_ID)
+    ADDON_NAME = ADDON.getAddonInfo('name')
+except Exception:
+    ADDON = None
+    ADDON_NAME = "Intro Skipper"
 
 
 def log(msg, level=xbmc.LOGINFO):
@@ -20,22 +24,38 @@ def log(msg, level=xbmc.LOGINFO):
 
 
 def get_setting(key, default=""):
-    try:
-        val = ADDON.getSetting(key)
-        return val if val != "" else default
-    except Exception:
-        return default
+    if ADDON:
+        try:
+            val = ADDON.getSetting(key)
+            return val if val != "" else default
+        except Exception:
+            return default
+    return default
 
 
 def get_setting_int(key, default=0):
-    try:
-        val = ADDON.getSettingInt(key)
-        return val
-    except Exception:
+    if ADDON:
         try:
-            return int(ADDON.getSetting(key))
+            val = ADDON.getSettingInt(key)
+            return val
         except Exception:
-            return default
+            try:
+                return int(ADDON.getSetting(key))
+            except Exception:
+                return default
+    return default
+
+
+def get_intro_action():
+    val = get_setting('intro_action', '0')
+    mapping = {'0': 'prompt', '1': 'autoskip', '2': 'disabled', 'prompt': 'prompt', 'autoskip': 'autoskip', 'disabled': 'disabled'}
+    return mapping.get(str(val), 'prompt')
+
+
+def get_credits_action():
+    val = get_setting('credits_action', '0')
+    mapping = {'0': 'prompt', '1': 'autoskip', '2': 'next_episode', '3': 'disabled', 'prompt': 'prompt', 'autoskip': 'autoskip', 'next_episode': 'next_episode', 'disabled': 'disabled'}
+    return mapping.get(str(val), 'prompt')
 
 
 class SkipPromptDialog(xbmcgui.WindowXMLDialog):
@@ -131,8 +151,8 @@ class IntroSkipperPlayer(xbmc.Player):
 
     def start_playback_loop(self):
         self.is_monitoring = True
-        intro_action = get_setting('intro_action', 'prompt')
-        credits_action = get_setting('credits_action', 'prompt')
+        intro_action = get_intro_action()
+        credits_action = get_credits_action()
         intro_duration = get_setting_int('intro_prompt_duration', 6)
         credits_duration = get_setting_int('credits_prompt_duration', 8)
 

@@ -1,91 +1,26 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<settings version="1">
-  <section id="service.introskipper">
-    <category id="connection" label="30000">
-      <group id="1">
-        <setting id="server_url" type="string" label="30001" help="30002">
-          <default>http://127.0.0.1:8037</default>
-        </setting>
-        <setting id="request_timeout" type="integer" label="30003" help="30004">
-          <level>0</level>
-          <default>3</default>
-          <constraints>
-            <minimum>1</minimum>
-            <maximum>10</maximum>
-            <step>1</step>
-          </constraints>
-        </setting>
-      </group>
+<settings>
+    <category label="30000"> <!-- Connection -->
+        <setting label="30001" type="text" id="server_url" default="http://127.0.0.1:8037"/>
+        <setting label="30003" type="slider" id="request_timeout" default="3" range="1,1,10" option="int"/>
     </category>
 
-    <category id="behavior" label="30010">
-      <group id="1">
-        <setting id="intro_action" type="string" label="30011">
-          <level>0</level>
-          <default>prompt</default>
-          <constraints>
-            <options>
-              <option label="30012">prompt</option>
-              <option label="30013">autoskip</option>
-              <option label="30014">disabled</option>
-            </options>
-          </constraints>
-        </setting>
-        <setting id="intro_prompt_duration" type="integer" label="30015">
-          <level>0</level>
-          <default>6</default>
-          <constraints>
-            <minimum>3</minimum>
-            <maximum>15</maximum>
-            <step>1</step>
-          </constraints>
-          <dependencies>
-            <dependency type="visible">
-              <condition on="intro_action" operator="is">prompt</condition>
-            </dependency>
-          </dependencies>
-        </setting>
-      </group>
-
-      <group id="2">
-        <setting id="credits_action" type="string" label="30020">
-          <level>0</level>
-          <default>prompt</default>
-          <constraints>
-            <options>
-              <option label="30012">prompt</option>
-              <option label="30013">autoskip</option>
-              <option label="30021">next_episode</option>
-              <option label="30014">disabled</option>
-            </options>
-          </constraints>
-        </setting>
-        <setting id="credits_prompt_duration" type="integer" label="30022">
-          <level>0</level>
-          <default>8</default>
-          <constraints>
-            <minimum>3</minimum>
-            <maximum>20</maximum>
-            <step>1</step>
-          </constraints>
-          <dependencies>
-            <dependency type="visible">
-              <condition on="credits_action" operator="is">prompt</condition>
-            </dependency>
-          </dependencies>
-        </setting>
-      </group>
+    <category label="30010"> <!-- Skip Behavior -->
+        <setting label="30011" type="enum" id="intro_action" lvalues="30012|30013|30014" default="0"/>
+        <setting label="30015" type="slider" id="intro_prompt_duration" default="6" range="3,1,15" option="int" subsetting="true" visible="eq(-1,0)"/>
+        <setting label="30020" type="enum" id="credits_action" lvalues="30012|30013|30021|30014" default="0"/>
+        <setting label="30022" type="slider" id="credits_prompt_duration" default="8" range="3,1,20" option="int" subsetting="true" visible="eq(-1,0)"/>
     </category>
 
-    <category id="path_mapping" label="30030">
-      <group id="1">
-        <setting id="path_prefix_client" type="string" label="30031" help="30032">
-          <default></default>
-        </setting>
-        <setting id="path_prefix_server" type="string" label="30033" help="30034">
-          <default></default>
-        </setting>
-      </group>
+    <category label="30030"> <!-- Path Mapping -->
+        <setting label="30031" type="text" id="path_prefix_client" default=""/>
+        <setting label="30033" type="text" id="path_prefix_server" default=""/>
     </category>
-  </section>
+
+    <category label="30040"> <!-- Scan Management -->
+        <setting label="30041" type="action" id="manage_sources_btn" action="RunScript(service.introskipper,manage_sources)"/>
+        <setting label="30043" type="action" id="trigger_scan_btn" action="RunScript(service.introskipper,scan)"/>
+        <setting label="30045" type="action" id="check_status_btn" action="RunScript(service.introskipper,status)"/>
+        <setting label="30047" type="action" id="monitor_scan_btn" action="RunScript(service.introskipper,monitor)"/>
+    </category>
 </settings>
