@@ -283,7 +283,6 @@ app.MapPost("/api/scan/item", async (
     }
 });
 
-
 // Stop scan endpoint
 app.MapPost("/api/scan/stop", (AnalysisQueue queue) =>
 {
@@ -313,6 +312,37 @@ app.MapGet("/api/logs", (
         loggerProvider.LogPath));
 });
 
+// Library / segment statistics endpoint
+app.MapGet("/api/stats", async (
+    ServerStorage storage,
+    MediaFileIndex index,
+    CancellationToken ct) =>
+{
+    var stats = await storage.Database.GetStatsAsync(ct).ConfigureAwait(false);
+    var seconds = TickConversions.ToSeconds(stats.TotalTicks);
+
+    var time = TimeSpan.FromSeconds(seconds);
+    var formattedTime = time.TotalHours >= 1
+        ? $"{(int)time.TotalHours}h {time.Minutes:D2}m {time.Seconds:D2}s"
+        : $"{time.Minutes}m {time.Seconds:D2}s";
+
+    var seriesCount = index.GetAllBySeason().Select(g => g.Key.Series).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+    if (seriesCount == 0 && stats.TotalItems > 0)
+    {
+        seriesCount = 1;
+    }
+
+    return Results.Ok(new ServerStatsResponse(
+        seriesCount,
+        stats.TotalItems,
+        stats.TotalSegments,
+        stats.IntroCount,
+        stats.CreditsCount,
+        stats.RecapCount,
+        stats.PreviewCount,
+        seconds,
+        formattedTime));
+});
 
 // Minimal landing page
 app.MapGet("/", (ServerStorage storage) => Results.Content(

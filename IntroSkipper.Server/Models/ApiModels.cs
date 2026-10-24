@@ -101,4 +101,28 @@ public sealed record ScanItemResponse(
     IReadOnlyList<SegmentResponse> Segments,
     string Message);
 
+/// <summary>
+/// Aggregated statistics response.
+/// </summary>
+/// <param name="TotalSeries">Total unique series indexed.</param>
+/// <param name="TotalEpisodes">Total unique episodes with detected segments.</param>
+/// <param name="TotalSegments">Total active detected segments count.</param>
+/// <param name="IntroCount">Total Introduction segments count.</param>
+/// <param name="CreditsCount">Total Credits segments count.</param>
+/// <param name="RecapCount">Total Recap segments count.</param>
+/// <param name="PreviewCount">Total Preview segments count.</param>
+/// <param name="TotalSkippedSeconds">Total skipped duration in seconds.</param>
+/// <param name="FormattedSkippedTime">Formatted skipped time (e.g. "1h 23m 45s").</param>
+public sealed record ServerStatsResponse(
+    int TotalSeries,
+    int TotalEpisodes,
+    int TotalSegments,
+    int IntroCount,
+    int CreditsCount,
+    int RecapCount,
+    int PreviewCount,
+    double TotalSkippedSeconds,
+    string FormattedSkippedTime);
+
+
 

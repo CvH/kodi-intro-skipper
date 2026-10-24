@@ -142,8 +142,58 @@ def view_server_log():
             print(err_msg)
 
 
-def show_status():
+def fetch_stats():
+    server_url = get_server_url()
+    url = f"{server_url}/api/stats"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Kodi-IntroSkipper/1.0'})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            if resp.status == 200:
+                data = resp.read().decode('utf-8')
+                return json.loads(data)
+    except Exception as ex:
+        log(f"Failed to fetch stats from {url}: {ex}", xbmc.LOGDEBUG if xbmc else None)
+    return None
 
+
+def show_stats():
+    stats = fetch_stats()
+    if not stats:
+        if xbmcgui:
+            xbmcgui.Dialog().ok(ADDON_NAME, "Could not retrieve statistics from IntroSkipper server.")
+        else:
+            print("Could not retrieve statistics from server.")
+        return
+
+    series = stats.get('totalSeries', 0)
+    episodes = stats.get('totalEpisodes', 0)
+    segments = stats.get('totalSegments', 0)
+    intros = stats.get('introCount', 0)
+    credits = stats.get('creditsCount', 0)
+    recaps = stats.get('recapCount', 0)
+    previews = stats.get('previewCount', 0)
+    time_str = stats.get('formattedSkippedTime', '0s')
+
+    msg = (
+        f"[B]Total Indexed Shows:[/B] {series}\n"
+        f"[B]Total Episodes Analyzed:[/B] {episodes}\n\n"
+        f"[B]Total Detected Segments:[/B] {segments}\n"
+        f" • [B]Intros:[/B] {intros}\n"
+        f" • [B]Credits:[/B] {credits}\n"
+        f" • [B]Recaps:[/B] {recaps}\n"
+        f" • [B]Previews:[/B] {previews}\n\n"
+        f"[B]Total Time Saved / Skipped:[/B] {time_str}"
+    )
+
+    if xbmcgui:
+        xbmcgui.Dialog().ok("IntroSkipper Library Statistics", msg)
+    else:
+        clean = msg.replace('[B]', '').replace('[/B]', '')
+        print("=== IntroSkipper Statistics ===")
+        print(clean)
+
+
+def show_status():
     status = fetch_server_status()
     if status is None:
         if xbmcgui:
@@ -178,9 +228,19 @@ def show_status():
             f"[B]Current File{count_tag}:[/B] {fname}\n"
         )
 
+    stats = fetch_stats()
+    stats_summary = ""
+    if stats:
+        stats_summary = (
+            f"\n[B]Analyzed Library:[/B] {stats.get('totalSeries', 0)} show(s), {stats.get('totalEpisodes', 0)} episode(s)\n"
+            f"[B]Detected Segments:[/B] {stats.get('introCount', 0)} Intros, {stats.get('creditsCount', 0)} Credits\n"
+            f"[B]Total Time Saved:[/B] {stats.get('formattedSkippedTime', '0s')}\n"
+        )
+
     msg = (
         f"[B]Server Status:[/B] {st}\n"
         f"{scan_info}"
+        f"{stats_summary}"
         f"[B]Queued Jobs:[/B] {queued}\n"
         f"[B]Configured Scan Paths:[/B] {sources_summary}\n"
         f"[B]Chromaprint / FFmpeg:[/B] {ffmpeg_valid}\n"
@@ -194,6 +254,7 @@ def show_status():
         return
 
     xbmcgui.Dialog().ok("IntroSkipper Status", msg)
+
 
 
 def manage_sources():
@@ -418,6 +479,9 @@ def main():
     elif arg == "logs":
         view_server_log()
         return
+    elif arg == "stats":
+        show_stats()
+        return
 
     # Default interactive menu when launched from Kodi UI
     status = fetch_server_status()
@@ -453,6 +517,10 @@ def main():
     action_map[next_idx] = "logs"
     next_idx += 1
 
+    options.append(f"{next_idx + 1}. Library Statistics...")
+    action_map[next_idx] = "stats"
+    next_idx += 1
+
     options.append(f"{next_idx + 1}. Add-on Settings...")
     action_map[next_idx] = "settings"
 
@@ -472,10 +540,11 @@ def main():
             live_monitor()
         elif action == "logs":
             view_server_log()
+        elif action == "stats":
+            show_stats()
         elif action == "settings":
             if ADDON:
                 ADDON.openSettings()
-
 
 
 if __name__ == '__main__':

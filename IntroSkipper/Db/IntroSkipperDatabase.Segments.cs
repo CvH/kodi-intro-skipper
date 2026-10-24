@@ -849,6 +849,47 @@ public sealed partial class IntroSkipperDatabase
         }
     }
 
+    /// <summary>
+    /// Returns aggregated statistics across all active detected segments.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the query operation with summary segment stats.</returns>
+    public async Task<SegmentStats> GetStatsAsync(CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync().ConfigureAwait(false);
+        using var db = _contextFactory.CreateDbContext();
+
+        var activeSegments = await db.Segments.AsNoTracking()
+            .Where(s => s.State == SegmentState.Active)
+            .Select(s => new { s.ItemId, s.Type, s.StartTicks, s.EndTicks })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var totalItems = activeSegments.Select(s => s.ItemId).Distinct().Count();
+        var introCount = activeSegments.Count(s => s.Type == AnalysisMode.Introduction);
+        var creditsCount = activeSegments.Count(s => s.Type == AnalysisMode.Credits);
+        var recapCount = activeSegments.Count(s => s.Type == AnalysisMode.Recap);
+        var previewCount = activeSegments.Count(s => s.Type == AnalysisMode.Preview);
+
+        long totalTicks = 0;
+        foreach (var s in activeSegments)
+        {
+            if (s.EndTicks > s.StartTicks)
+            {
+                totalTicks += s.EndTicks - s.StartTicks;
+            }
+        }
+
+        return new SegmentStats(
+            totalItems,
+            activeSegments.Count,
+            introCount,
+            creditsCount,
+            recapCount,
+            previewCount,
+            totalTicks);
+    }
+
     // Every stored row must carry a mappable mode: downstream conversions index
     // AnalysisHelpers.ModeToSegmentType with it, so a persisted unmapped mode would
     // poison every later mirror of the item. The segments POST edge rejects such modes
