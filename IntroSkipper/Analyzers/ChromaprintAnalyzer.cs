@@ -4,6 +4,7 @@
 // SPDX-FileCopyrightText: 2024-2026 Kilian von Pflugk
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Collections.Concurrent;
 using System.Numerics;
 using IntroSkipper.Configuration;
 using IntroSkipper.Data;
@@ -210,12 +211,22 @@ internal sealed partial class ChromaprintAnalyzer(
         }
 
         // Compute fingerprints for all episodes in the season
-        foreach (var episode in episodeAnalysisQueue)
+        var parallelism = Math.Max(1, _config.MaxParallelism);
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = parallelism,
+            CancellationToken = cancellationToken,
+        };
+
+        var concurrentFingerprints = new ConcurrentDictionary<Guid, uint[]>();
+        var concurrentFailures = new ConcurrentBag<Guid>();
+
+        await Parallel.ForEachAsync(episodeAnalysisQueue, parallelOptions, async (episode, ct) =>
         {
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                fingerprintCache[episode.EpisodeId] = await _ffmpegService.FingerprintAsync(episode, mode, cancellationToken).ConfigureAwait(false);
+                var fp = await _ffmpegService.FingerprintAsync(episode, mode, ct).ConfigureAwait(false);
+                concurrentFingerprints[episode.EpisodeId] = fp;
             }
             catch (FingerprintException ex)
             {
@@ -232,12 +243,22 @@ internal sealed partial class ChromaprintAnalyzer(
 
                 // Keep a transient fingerprint failure retriable. A completed neighbor may be
                 // included only to provide a comparison fingerprint; do not discard its valid result.
-                fingerprintCache[episode.EpisodeId] = [];
+                concurrentFingerprints[episode.EpisodeId] = [];
                 if (episode.NeedsAnalysis(mode))
                 {
-                    fingerprintFailures.Add(episode.EpisodeId);
+                    concurrentFailures.Add(episode.EpisodeId);
                 }
             }
+        }).ConfigureAwait(false);
+
+        foreach (var (key, value) in concurrentFingerprints)
+        {
+            fingerprintCache[key] = value;
+        }
+
+        foreach (var failure in concurrentFailures)
+        {
+            fingerprintFailures.Add(failure);
         }
 
         for (var current = 0; current < episodeAnalysisQueue.Count; current++)

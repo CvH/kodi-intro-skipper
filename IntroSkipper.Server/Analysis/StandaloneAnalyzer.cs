@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 rlauuzo
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.Collections.Concurrent;
 using System.Globalization;
 using IntroSkipper.Analyzers;
 using IntroSkipper.Analyzers.Credits;
@@ -58,49 +59,55 @@ public sealed class StandaloneAnalyzer(
         var introHash = ConfigHasher.Analysis(_config, AnalysisMode.Introduction, AnalyzerAction.Default, ffmpegValid, chapterSource: ChapterSource.Embedded);
         var creditsHash = ConfigHasher.Analysis(_config, AnalysisMode.Credits, AnalyzerAction.Default, ffmpegValid, chapterSource: ChapterSource.Embedded);
 
-        var queuedEpisodes = new List<QueuedEpisode>();
         var seriesId = ItemIdGenerator.FromSeries(seriesName);
         var seasonId = ItemIdGenerator.FromSeason(seriesName, seasonNum);
 
         var orderedEpisodes = episodes.OrderBy(e => e.EpisodeNumber).ToList();
-        for (var i = 0; i < orderedEpisodes.Count; i++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
+        var baggedEpisodes = new ConcurrentBag<QueuedEpisode>();
+        var parallelism = Math.Max(1, _config.MaxParallelism);
+        var probedCount = 0;
 
-            var file = orderedEpisodes[i];
-            _progressTracker.UpdateFile(file.FilePath, seriesName, seasonNum, file.EpisodeNumber, "Probing media & chapters", i + 1, orderedEpisodes.Count);
-
-            var episodeId = ItemIdGenerator.FromPath(file.FilePath);
-            var (duration, chapters) = await ProbeMediaAsync(file.FilePath, episodeId, cancellationToken).ConfigureAwait(false);
-
-            if (duration <= 0)
+        await Parallel.ForEachAsync(
+            orderedEpisodes,
+            new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
+            async (file, ct) =>
             {
-                _logger.LogWarning("Skipping {File}: duration probe failed", file.FilePath);
-                continue;
-            }
+                var current = Interlocked.Increment(ref probedCount);
+                _progressTracker.UpdateFile(file.FilePath, seriesName, seasonNum, file.EpisodeNumber, "Probing media & chapters", current, orderedEpisodes.Count);
 
-            var queued = new QueuedEpisode
-            {
-                EpisodeId = episodeId,
-                SeasonId = seasonId,
-                SeriesId = seriesId,
-                Name = file.Title,
-                SeriesName = seriesName,
-                SeasonNumber = seasonNum,
-                EpisodeNumber = file.EpisodeNumber,
-                Path = file.FilePath,
-                Duration = duration,
-                Chapters = chapters,
-                ChaptersSource = ChapterSource.Embedded,
-                Category = QueuedMediaCategory.Episode,
-                IntroFingerprintEnd = Math.Min(duration >= 5 * 60 ? duration * _config.AnalysisPercent / 100.0 : duration, 60 * _config.AnalysisLengthLimit),
-                CreditsFingerprintStart = Math.Max(0, duration - _config.MaximumCreditsDuration),
-                CreditsFingerprintEnd = duration,
-                AnalysisConfigHash = introHash,
-            };
+                var episodeId = ItemIdGenerator.FromPath(file.FilePath);
+                var (duration, chapters) = await ProbeMediaAsync(file.FilePath, episodeId, ct).ConfigureAwait(false);
 
-            queuedEpisodes.Add(queued);
-        }
+                if (duration <= 0)
+                {
+                    _logger.LogWarning("Skipping {File}: duration probe failed", file.FilePath);
+                    return;
+                }
+
+                var queued = new QueuedEpisode
+                {
+                    EpisodeId = episodeId,
+                    SeasonId = seasonId,
+                    SeriesId = seriesId,
+                    Name = file.Title,
+                    SeriesName = seriesName,
+                    SeasonNumber = seasonNum,
+                    EpisodeNumber = file.EpisodeNumber,
+                    Path = file.FilePath,
+                    Duration = duration,
+                    Chapters = chapters,
+                    ChaptersSource = ChapterSource.Embedded,
+                    Category = QueuedMediaCategory.Episode,
+                    IntroFingerprintEnd = Math.Min(duration >= 5 * 60 ? duration * _config.AnalysisPercent / 100.0 : duration, 60 * _config.AnalysisLengthLimit),
+                    CreditsFingerprintStart = Math.Max(0, duration - _config.MaximumCreditsDuration),
+                    CreditsFingerprintEnd = duration,
+                    AnalysisConfigHash = introHash,
+                };
+
+                baggedEpisodes.Add(queued);
+            }).ConfigureAwait(false);
+
+        var queuedEpisodes = baggedEpisodes.OrderBy(e => e.EpisodeNumber).ToList();
 
         if (queuedEpisodes.Count == 0)
         {
