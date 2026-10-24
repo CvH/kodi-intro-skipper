@@ -65,9 +65,16 @@ public sealed partial class MediaScanner(ILogger<MediaScanner> logger, KodiVfsBr
         }
 
         var results = new List<ParsedEpisodeInfo>();
+        var enumerationOptions = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            ReturnSpecialDirectories = false,
+        };
+
         try
         {
-            foreach (var filePath in Directory.EnumerateFiles(directoryPath, "*.*", SearchOption.AllDirectories))
+            foreach (var filePath in Directory.EnumerateFiles(directoryPath, "*.*", enumerationOptions))
             {
                 var extension = Path.GetExtension(filePath);
                 if (!SupportedExtensions.Contains(extension))
