@@ -28,10 +28,54 @@ public sealed class ServerFileLoggerProvider : ILoggerProvider
         }
     }
 
+    /// <summary>
+    /// Gets the file path to the log file.
+    /// </summary>
+    public string LogPath => _filePath;
+
     /// <inheritdoc/>
     public ILogger CreateLogger(string categoryName)
     {
         return new FileLogger(categoryName, _filePath);
+    }
+
+    /// <summary>
+    /// Reads the most recent lines from the server log file in a thread-safe manner.
+    /// </summary>
+    /// <param name="maxLines">Maximum lines to retrieve.</param>
+    /// <returns>A list of recent log lines.</returns>
+    public IReadOnlyList<string> ReadRecentLines(int maxLines = 100)
+    {
+        if (!File.Exists(_filePath))
+        {
+            return [];
+        }
+
+        try
+        {
+            lock (WriteLock)
+            {
+                using var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(fs);
+                var allLines = new List<string>();
+                string? line;
+                while ((line = reader.ReadLine()) is not null)
+                {
+                    allLines.Add(line);
+                }
+
+                if (allLines.Count <= maxLines)
+                {
+                    return allLines;
+                }
+
+                return allLines.Skip(allLines.Count - maxLines).ToList();
+            }
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     /// <inheritdoc/>

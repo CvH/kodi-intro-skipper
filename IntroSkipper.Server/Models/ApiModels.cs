@@ -53,3 +53,15 @@ public sealed record ScanRequest(
 public sealed record StopScanResponse(
     string Message,
     bool Stopped);
+
+/// <summary>
+/// Response returned for server log inspection.
+/// </summary>
+/// <param name="Lines">Recent log lines.</param>
+/// <param name="TotalLines">Total count of returned lines.</param>
+/// <param name="LogPath">Path to server.log file.</param>
+public sealed record ServerLogsResponse(
+    IReadOnlyList<string> Lines,
+    int TotalLines,
+    string LogPath);
+

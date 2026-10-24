@@ -116,7 +116,34 @@ def stop_scan():
     return False
 
 
+def view_server_log():
+    server_url = get_server_url()
+    url = f"{server_url}/api/logs?lines=150&raw=true"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Kodi-IntroSkipper/1.0'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status == 200:
+                log_content = resp.read().decode('utf-8', errors='replace')
+                if not log_content.strip():
+                    log_content = "Server log is currently empty."
+
+                if xbmcgui:
+                    xbmcgui.DialogTextViewer().textviewer("IntroSkipper Server Log", log_content)
+                else:
+                    print("=== IntroSkipper Server Log ===")
+                    print(log_content)
+                return
+    except Exception as ex:
+        err_msg = f"Failed to retrieve log from {url}:\n{ex}"
+        log(err_msg, xbmc.LOGWARNING if xbmc else None)
+        if xbmcgui:
+            xbmcgui.Dialog().ok(ADDON_NAME, err_msg)
+        else:
+            print(err_msg)
+
+
 def show_status():
+
     status = fetch_server_status()
     if status is None:
         if xbmcgui:
@@ -388,6 +415,9 @@ def main():
     elif arg == "monitor":
         live_monitor()
         return
+    elif arg == "logs":
+        view_server_log()
+        return
 
     # Default interactive menu when launched from Kodi UI
     status = fetch_server_status()
@@ -419,6 +449,10 @@ def main():
     action_map[next_idx] = "monitor"
     next_idx += 1
 
+    options.append(f"{next_idx + 1}. View Server Log...")
+    action_map[next_idx] = "logs"
+    next_idx += 1
+
     options.append(f"{next_idx + 1}. Add-on Settings...")
     action_map[next_idx] = "settings"
 
@@ -436,9 +470,12 @@ def main():
             manage_sources()
         elif action == "monitor":
             live_monitor()
+        elif action == "logs":
+            view_server_log()
         elif action == "settings":
             if ADDON:
                 ADDON.openSettings()
+
 
 
 if __name__ == '__main__':

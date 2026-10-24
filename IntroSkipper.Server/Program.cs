@@ -47,7 +47,9 @@ if (!string.IsNullOrWhiteSpace(ffmpegPath))
 // Ensure server.log is written to data directory or current working directory
 var logDir = dataDir ?? Directory.GetCurrentDirectory();
 var logPath = Path.Combine(logDir, "server.log");
-builder.Logging.AddProvider(new ServerFileLoggerProvider(logPath));
+var fileLogger = new ServerFileLoggerProvider(logPath);
+builder.Logging.AddProvider(fileLogger);
+builder.Services.AddSingleton(fileLogger);
 
 // Ensure Kestrel listens on configured port if no urls specified
 if (builder.Configuration["urls"] is null && Environment.GetEnvironmentVariable("ASPNETCORE_URLS") is null)
@@ -188,6 +190,27 @@ app.MapPost("/api/scan/stop", (AnalysisQueue queue) =>
         stopped ? "Scan stopped and queue cleared." : "No active scan was running.",
         stopped));
 });
+
+// Server log inspection endpoint
+app.MapGet("/api/logs", (
+    [FromQuery] int? lines,
+    [FromQuery] bool? raw,
+    ServerFileLoggerProvider loggerProvider) =>
+{
+    var count = Math.Clamp(lines ?? 100, 1, 1000);
+    var recent = loggerProvider.ReadRecentLines(count);
+
+    if (raw == true)
+    {
+        return Results.Text(string.Join(Environment.NewLine, recent), "text/plain; charset=utf-8");
+    }
+
+    return Results.Ok(new ServerLogsResponse(
+        recent,
+        recent.Count,
+        loggerProvider.LogPath));
+});
+
 
 // Minimal landing page
 app.MapGet("/", (ServerStorage storage) => Results.Content(
