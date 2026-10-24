@@ -150,7 +150,29 @@ internal sealed partial class FFmpegService : IFFmpegService
     /// </summary>
     internal static string? CustomFFmpegPath { get; set; }
 
-    private static string FFmpegPath => CustomFFmpegPath ?? Plugin.Instance?.FFmpegPath ?? "ffmpeg";
+    private static string FFmpegPath
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(CustomFFmpegPath))
+            {
+                return CustomFFmpegPath;
+            }
+
+            if (Plugin.Instance?.FFmpegPath is { } pluginPath && !string.IsNullOrWhiteSpace(pluginPath))
+            {
+                return pluginPath;
+            }
+
+            var appDirFfmpeg = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg");
+            if (File.Exists(appDirFfmpeg))
+            {
+                return appDirFfmpeg;
+            }
+
+            return "ffmpeg";
+        }
+    }
 
     /// <inheritdoc/>
     public Task<bool> CheckFFmpegVersionAsync(CancellationToken cancellationToken = default)
