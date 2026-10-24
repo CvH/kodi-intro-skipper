@@ -35,7 +35,7 @@ internal sealed partial class BlackFrameAnalyzer(
     /// </summary>
     private const double MaxChapterOffsetFromBlackRunStart = 15;
 
-    private readonly PluginConfiguration _config = configuration ?? Plugin.Instance?.Configuration ?? new PluginConfiguration();
+    private readonly PluginConfiguration _config = configuration ?? new PluginConfiguration();
     private readonly TimeSpan _maximumError = TimeSpan.FromSeconds(4);
     private readonly ILogger<BlackFrameAnalyzer> _logger = logger;
     private readonly IFFmpegService _ffmpegService = ffmpegService;

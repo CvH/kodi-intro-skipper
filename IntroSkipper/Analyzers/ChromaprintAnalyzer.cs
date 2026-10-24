@@ -51,7 +51,7 @@ internal sealed partial class ChromaprintAnalyzer(
     // A shared region that starts this close to the start of its fingerprint starts at 0.
     private const double StartSnapSeconds = 5;
 
-    private readonly PluginConfiguration _config = configuration ?? Plugin.Instance?.Configuration ?? new PluginConfiguration();
+    private readonly PluginConfiguration _config = configuration ?? new PluginConfiguration();
     private readonly ILogger<ChromaprintAnalyzer> _logger = logger;
     private readonly IFFmpegService _ffmpegService = ffmpegService;
     private readonly DetectionCacheService _cacheService = cacheService;

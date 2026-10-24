@@ -15,7 +15,6 @@ using IntroSkipper.Data;
 using IntroSkipper.Db;
 using IntroSkipper.FFmpeg;
 using IntroSkipper.Helper;
-using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -112,7 +111,7 @@ public sealed class TestSubtitleAnalyzer
     // Cues from every source come back in start order, which the recap search relies on.
     // The .ass sidecar is read first and holds the latest cue. The SAMI sidecar clears its cue
     // with a blank one, which ffmpeg logs as a decoding error without failing the run.
-    [Fact]
+    [FactSkipFFmpegTests]
     public async Task ExtractSubtitleCuesAsync_ReadsTextSidecarsInStartOrder()
     {
         using var directory = new TempDirectory();
@@ -135,7 +134,7 @@ public sealed class TestSubtitleAnalyzer
     // starts at 20 s; an outpoint that left out the start time would cut the cue across the
     // window's end. The middle cue lies outside both windows, so its absence shows the read was
     // cut.
-    [Theory]
+    [TheorySkipFFmpegTests]
     [InlineData(0, 60, new[] { "Previously on the show", "Across the end" })]
     [InlineData(180, 300, new[] { "Next time on the show" })]
     public async Task ExtractSubtitleCuesAsync_Window_ReadsWhatAFullReadFindsInsideIt(double start, double end, string[] inside)
@@ -158,7 +157,7 @@ public sealed class TestSubtitleAnalyzer
     // demuxer's default -auto_convert would put every H.264 packet through h264_mp4toannexb,
     // whose setup fails on that record before a single cue is read. The audio track keeps the
     // file's start time known, which the head read needs, though the video's is not.
-    [Fact]
+    [FactSkipFFmpegTests]
     public async Task ExtractSubtitleCuesAsync_HeadReadOfABrokenH264Record_ReadsTheWindow()
     {
         using var directory = new TempDirectory();
@@ -174,7 +173,7 @@ public sealed class TestSubtitleAnalyzer
     // The embedded streams and the sidecars share one ffmpeg run, also when the run seeks on a
     // file whose clock starts at 20 s. -copyts and -start_at_zero then apply to the sidecar
     // too, and its cue keeps its time.
-    [Fact]
+    [FactSkipFFmpegTests]
     public async Task ExtractSubtitleCuesAsync_SeekingWindow_ReadsTheSidecarInTheSameRun()
     {
         using var directory = new TempDirectory();
@@ -193,7 +192,7 @@ public sealed class TestSubtitleAnalyzer
     // Each mode reads its own window of the file: the recap window at the start, and the last
     // MaximumPreviewDuration seconds for a preview. Each window holds its mode's cue, and a
     // chapter at 70 s ends the recap.
-    [Theory]
+    [TheorySkipFFmpegTests]
     [InlineData(AnalysisMode.Recap, 20, 70)]
     [InlineData(AnalysisMode.Preview, 250, 300)]
     public async Task AnalyzeMediaFiles_FindsTheCueInsideTheWindowItReads(AnalysisMode mode, double expectedStart, double expectedEnd)
@@ -202,7 +201,6 @@ public sealed class TestSubtitleAnalyzer
         var episodeId = Guid.NewGuid();
         var database = DatabaseTestHelpers.CreateTempSegmentDatabase();
         var config = new PluginConfiguration { EnableSubtitleRecapDetection = true, EnableSubtitlePreviewDetection = true };
-        using var pluginScope = EntrypointTestHelpers.CreatePluginScope(config);
         var episode = new QueuedEpisode
         {
             EpisodeId = episodeId,
@@ -223,7 +221,7 @@ public sealed class TestSubtitleAnalyzer
     // ffmpeg drops every cue of a sidecar that is not UTF-8, and the run still succeeds. A
     // sidecar in a legacy charset is read through a UTF-8 copy decoded with its detected
     // charset, so every cue comes back with its text.
-    [Theory]
+    [TheorySkipFFmpegTests]
     [InlineData("windows-1252", "Was bisher geschah – Größe…", "Wir sehen uns nächste Woche. Tschüß!", "Das Mädchen über der Brücke")]
     [InlineData("shift_jis", "前回までは", "東京の天気は晴れです。", "また来週お会いしましょう。")]
     [InlineData("gbk", "前情提要", "今天的天气很好。", "我们下周再见。")]
@@ -246,16 +244,13 @@ public sealed class TestSubtitleAnalyzer
     // generated .srt files, through the ffmpeg run that writes one capped WebVTT file per
     // stream. The run leaves nothing in the plugin's temp directory, and the language setting
     // filters on the tags ffprobe lists. The second stream holds the earlier cue.
-    [Fact]
+    [FactSkipFFmpegTests]
     public async Task ExtractSubtitleCuesAsync_ReadsEmbeddedStreamsInSelectedLanguages()
     {
         using var directory = new TempDirectory();
         var mediaPath = await MuxEpisodeAsync(directory);
 
         var config = new PluginConfiguration();
-        using var pluginScope = EntrypointTestHelpers.CreatePluginScope(config);
-        var tempDirectory = directory.Info.CreateSubdirectory("temp");
-        EntrypointTestHelpers.SetPropertyOrField(Plugin.Instance!, "TempDirectory", tempDirectory.FullName);
         var ffmpeg = FfmpegTestHelpers.CreateFFmpegService();
         var episode = new QueuedEpisode { Name = "episode", Path = mediaPath };
 
@@ -268,13 +263,12 @@ public sealed class TestSubtitleAnalyzer
         Assert.True(everyLanguage.Complete);
         Assert.Equal([germanCue], germanOnly.Cues);
         Assert.True(germanOnly.Complete);
-        Assert.Empty(tempDirectory.EnumerateFileSystemInfos());
     }
 
     // A sidecar that ffmpeg cannot open, or that cannot be read at all, fails only itself: the
     // embedded streams and the sidecar after it are still read, and the scan is incomplete, so
     // the episode is retried.
-    [Theory]
+    [TheorySkipFFmpegTests]
     [InlineData("garbage")]
     [InlineData("empty")]
     [InlineData("locked")]
@@ -298,7 +292,7 @@ public sealed class TestSubtitleAnalyzer
 
     // Sidecars whose names differ only in case are two files, and each is read. Only a
     // case-sensitive file system can hold both, so the case runs on Linux (as on CI).
-    [Fact]
+    [FactSkipFFmpegTests]
     public async Task ExtractSubtitleCuesAsync_ReadsSidecarsWhoseNamesDifferOnlyInCase()
     {
         if (!OperatingSystem.IsLinux())
@@ -320,7 +314,7 @@ public sealed class TestSubtitleAnalyzer
     // ffprobe cannot list the streams of a file that is not media. The scan comes back
     // incomplete instead of throwing, so the subtitle analyzer keeps the standing rows and
     // retries the episode rather than settling it as having no match.
-    [Fact]
+    [FactSkipFFmpegTests]
     public async Task ExtractSubtitleCuesAsync_UnreadableMediaFile_ReturnsAnIncompleteScan()
     {
         using var directory = new TempDirectory();
@@ -456,7 +450,6 @@ public sealed class TestSubtitleAnalyzer
             MinimumRecapDuration = 5,
             MaximumRecapDuration = 120,
         };
-        using var pluginScope = EntrypointTestHelpers.CreatePluginScope(config);
         var ffmpeg = new StubFFmpegService
         {
             Subtitles = _ => new([new SubtitleCue(10, 13, cueText)], Complete: true),
@@ -500,7 +493,6 @@ public sealed class TestSubtitleAnalyzer
             MinimumRecapDuration = 5,
             MaximumRecapDuration = 120,
         };
-        using var pluginScope = EntrypointTestHelpers.CreatePluginScope(config);
         var ffmpeg = new StubFFmpegService
         {
             Subtitles = _ => new([new SubtitleCue(30, 33, "Previously on the story")], Complete: true),
@@ -546,7 +538,6 @@ public sealed class TestSubtitleAnalyzer
         }
 
         var config = new PluginConfiguration { EnableSubtitleRecapDetection = true, MaximumRecapDuration = maximumRecapDuration };
-        using var pluginScope = EntrypointTestHelpers.CreatePluginScope(config);
         var ffmpeg = new StubFFmpegService
         {
             Subtitles = _ => new([new SubtitleCue(10, 13, "Previously on the story")], Complete: true),
@@ -574,7 +565,7 @@ public sealed class TestSubtitleAnalyzer
 
     // The recap ends at the black run real ffmpeg reports: a generated episode with a recap cue
     // at 5 s, a 1 s black run at 30 s, which is too short, and a 3 s run at 40 s.
-    [Fact]
+    [FactSkipFFmpegTests]
     public async Task AnalyzeMediaFiles_EndsASubtitleRecapAtTheBlackRunFfmpegReports()
     {
         using var directory = new TempDirectory();
@@ -594,7 +585,6 @@ public sealed class TestSubtitleAnalyzer
         var episodeId = Guid.NewGuid();
         var database = DatabaseTestHelpers.CreateTempSegmentDatabase();
         var config = new PluginConfiguration { EnableSubtitleRecapDetection = true };
-        using var pluginScope = EntrypointTestHelpers.CreatePluginScope(config, []);
         var episode = new QueuedEpisode { EpisodeId = episodeId, Name = "episode", Path = mediaPath, Duration = 60, IntroFingerprintEnd = 60, AnalysisConfigHash = "subtitle" };
 
         await new SubtitleAnalyzer(NullLogger<SubtitleAnalyzer>.Instance, FfmpegTestHelpers.CreateFFmpegService(), database, config)

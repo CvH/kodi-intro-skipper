@@ -14,14 +14,13 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Xml.Serialization;
 using IntroSkipper.Data;
-using MediaBrowser.Model.Plugins;
 
 namespace IntroSkipper.Configuration;
 
 /// <summary>
 /// Plugin configuration.
 /// </summary>
-public class PluginConfiguration : BasePluginConfiguration
+public class PluginConfiguration
 {
     /// <summary>
     /// Default percentage of each episode's audio track to analyze.

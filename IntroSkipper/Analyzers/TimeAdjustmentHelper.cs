@@ -6,7 +6,6 @@
 using IntroSkipper.Configuration;
 using IntroSkipper.Data;
 using IntroSkipper.FFmpeg;
-using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace IntroSkipper.Analyzers;

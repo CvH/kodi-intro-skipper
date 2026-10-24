@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using IntroSkipper.Data;
-using Jellyfin.Database.Implementations.Enums;
 
 namespace IntroSkipper.SegmentChanges;
 

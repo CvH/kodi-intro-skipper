@@ -745,8 +745,8 @@ public sealed class TestDatabaseFacades : IDisposable
             case LargeIdSetOperation.CacheStaleIdsAndDelete:
                 {
                     var cacheDatabase = DatabaseTestHelpers.CreateCacheDatabase(_db.Path);
-                    cacheDatabase.Upsert(keptId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 10, EntrypointTestHelpers.EmptyJsonArray, string.Empty);
-                    cacheDatabase.Upsert(staleId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 10, EntrypointTestHelpers.EmptyJsonArray, string.Empty);
+                    cacheDatabase.Upsert(keptId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 10, DatabaseTestHelpers.EmptyJsonArray, string.Empty);
+                    cacheDatabase.Upsert(staleId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 10, DatabaseTestHelpers.EmptyJsonArray, string.Empty);
 
                     Assert.Equal([staleId], await cacheDatabase.GetStaleItemIdsAsync(Padded(keptId).ToHashSet()));
 

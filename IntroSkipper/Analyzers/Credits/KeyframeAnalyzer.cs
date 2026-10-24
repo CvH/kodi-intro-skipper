@@ -67,7 +67,7 @@ internal sealed partial class KeyframeAnalyzer(
     private const double DarkPictureSaturationMaximum = 8;
     private const double DarkPictureLumaMaximum = 200;
 
-    private readonly PluginConfiguration _config = configuration ?? Plugin.Instance?.Configuration ?? new PluginConfiguration();
+    private readonly PluginConfiguration _config = configuration ?? new PluginConfiguration();
     private readonly ILogger<KeyframeAnalyzer> _logger = logger;
     private readonly IFFmpegService _ffmpegService = ffmpegService;
     private readonly DetectionCacheService _cacheService = cacheService;

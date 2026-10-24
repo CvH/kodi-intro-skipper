@@ -10,8 +10,6 @@ using System.Threading.Tasks;
 using IntroSkipper.Analyzers.Credits;
 using IntroSkipper.Configuration;
 using IntroSkipper.Data;
-using IntroSkipper.Providers;
-using Jellyfin.Database.Implementations.Enums;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -70,11 +68,11 @@ public sealed class TestKeyframeAnalyzerFallback
 
         var database = DatabaseTestHelpers.CreateTempSegmentDatabase();
         await database.ReplaceAutoSegmentsAsync(episode.EpisodeId, AnalysisMode.Credits, combined);
-        var mirrored = await new SegmentDtoFactory(database).CreateAsync(episode.EpisodeId, CancellationToken.None);
+        var stored = await database.GetSegmentsAsync(episode.EpisodeId);
 
-        Assert.All(mirrored, segment => Assert.Equal(MediaSegmentType.Outro, segment.Type));
+        Assert.All(stored, segment => Assert.Equal(AnalysisMode.Credits, segment.Type));
         Assert.Equal(expected.Select(range => (TickConversions.FromSeconds(range.Start), TickConversions.FromSeconds(range.End))),
-            mirrored.Select(segment => (segment.StartTicks, segment.EndTicks)));
+            stored.Select(segment => (segment.StartTicks, segment.EndTicks)));
     }
 
     [Fact]

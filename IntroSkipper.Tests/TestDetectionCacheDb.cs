@@ -29,9 +29,9 @@ public sealed class TestDetectionCacheDbContext : IDisposable
         var cacheDatabase = _cache.Database;
         var itemId = Guid.NewGuid();
 
-        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Silence, 0, 30, EntrypointTestHelpers.EmptyJsonArray, "old");
+        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Silence, 0, 30, DatabaseTestHelpers.EmptyJsonArray, "old");
         cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Silence, 0, 30, Encoding.UTF8.GetBytes("[1]"), "new");
-        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Silence, 30, 60, EntrypointTestHelpers.EmptyJsonArray, "new");
+        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Silence, 30, 60, DatabaseTestHelpers.EmptyJsonArray, "new");
 
         var replaced = cacheDatabase.FindEntry(itemId, AnalysisMode.Introduction, CacheEntryType.Silence, 0, 30);
         Assert.NotNull(replaced);
@@ -85,7 +85,7 @@ public sealed class TestDetectionCacheDbContext : IDisposable
         using (var db = CreateContext())
         {
             db.EnsureSchema();
-            db.DetectionCache.Add(new DbDetectionCache(id, AnalysisMode.Introduction, CacheEntryType.Chromaprint, EntrypointTestHelpers.EmptyJsonArray));
+            db.DetectionCache.Add(new DbDetectionCache(id, AnalysisMode.Introduction, CacheEntryType.Chromaprint, DatabaseTestHelpers.EmptyJsonArray));
             db.SaveChanges();
         }
 

@@ -10,7 +10,6 @@ using IntroSkipper.Configuration;
 using IntroSkipper.Data;
 using IntroSkipper.Db;
 using IntroSkipper.FFmpeg;
-using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace IntroSkipper.Analyzers;
@@ -38,7 +37,7 @@ internal sealed partial class ChapterAnalyzer(
     private readonly ILogger<ChapterAnalyzer> _logger = logger;
     private readonly IFFmpegService _ffmpegService = ffmpegService;
     private readonly IntroSkipperDatabase _database = database;
-    private readonly PluginConfiguration _config = configuration ?? Plugin.Instance?.Configuration ?? new PluginConfiguration();
+    private readonly PluginConfiguration _config = configuration ?? new PluginConfiguration();
     private readonly bool _enableChapterDetection = enableChapterDetection;
     private readonly bool _enableRecapBlackFrameFallback = enableRecapBlackFrameFallback;
     private readonly Dictionary<AnalysisMode, string> _expressions = [];

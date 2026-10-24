@@ -7,9 +7,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Unicode;
+using IntroSkipper.Configuration;
 using IntroSkipper.Data;
 using IntroSkipper.Helper;
-using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
 using UtfUnknown;
 
@@ -159,6 +159,11 @@ internal sealed partial class FFmpegService : IFFmpegService
     /// <summary>
     /// Gets or sets an optional delegate to report active media analysis operations on a file.
     /// </summary>
+    /// <summary>
+    /// Gets or sets an optional configuration instance used when running standalone.
+    /// </summary>
+    internal static PluginConfiguration? ConfigOverride { get; set; }
+
     internal static Action<string, string>? ActivityReporter { get; set; }
 
     private static string FFmpegPath
@@ -168,11 +173,6 @@ internal sealed partial class FFmpegService : IFFmpegService
             if (!string.IsNullOrWhiteSpace(CustomFFmpegPath))
             {
                 return CustomFFmpegPath;
-            }
-
-            if (Plugin.Instance?.FFmpegPath is { } pluginPath && !string.IsNullOrWhiteSpace(pluginPath))
-            {
-                return pluginPath;
             }
 
             var appDirFfmpeg = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg");
@@ -250,7 +250,7 @@ internal sealed partial class FFmpegService : IFFmpegService
     public Task<TimeRange[]> DetectSilenceAsync(QueuedEpisode episode, TimeRange range, AnalysisMode mode, CancellationToken cancellationToken = default)
     {
         // -vn, -sn, -dn: ignore video, subtitle, and data tracks
-        var noise = (Plugin.Instance?.Configuration.SilenceDetectionMaximumNoise ?? -50).ToString(CultureInfo.InvariantCulture);
+        var noise = (ConfigOverride?.SilenceDetectionMaximumNoise ?? -50).ToString(CultureInfo.InvariantCulture);
         string[] args =
         [
             "-vn", "-sn", "-dn",
@@ -749,7 +749,7 @@ internal sealed partial class FFmpegService : IFFmpegService
             return FFmpegOutputParser.ParseChapters(
                 Encoding.UTF8.GetString(capture.Stdout.Span),
                 TickConversions.FromSeconds(episode.Duration),
-                Plugin.Instance?.ChapterNameFormat ?? "Chapter {0}");
+                "Chapter {0}");
         }
         catch (Exception ex) when (ex is JsonException || IsProcessFailure(ex))
         {
@@ -765,7 +765,7 @@ internal sealed partial class FFmpegService : IFFmpegService
         var complete = false;
         try
         {
-            var languages = SubtitleLanguageSelection.Parse(Plugin.Instance?.Configuration.SubtitleLanguages);
+            var languages = SubtitleLanguageSelection.Parse(ConfigOverride?.SubtitleLanguages);
             var listing = await _subtitleStreamListings.GetAsync(
                 episode,
                 (episode.Path, languages.Normalized),
@@ -782,7 +782,7 @@ internal sealed partial class FFmpegService : IFFmpegService
             // Each output gets an equal share of the episode's cap, so the files on disk stay within it.
             var outputLimit = SubtitleEpisodeMaximumBytes / outputCount;
             var directory = Directory.CreateDirectory(Path.Join(
-                Plugin.Instance?.TempDirectory ?? Path.GetTempPath(),
+                Path.GetTempPath(),
                 "introskipper-subtitles-" + Guid.NewGuid().ToString("N")));
             try
             {
@@ -1161,7 +1161,7 @@ internal sealed partial class FFmpegService : IFFmpegService
         if (!infoQuery)
         {
             processArgs.Add("-threads");
-            processArgs.Add((Plugin.Instance?.Configuration.ProcessThreads ?? 0).ToString(CultureInfo.InvariantCulture));
+            processArgs.Add((ConfigOverride?.ProcessThreads ?? 0).ToString(CultureInfo.InvariantCulture));
         }
 
         processArgs.Add("-loglevel");
@@ -1185,7 +1185,7 @@ internal sealed partial class FFmpegService : IFFmpegService
     private static bool IsProcessFailure(Exception ex)
         => ex is IOException or InvalidOperationException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or TimeoutException;
 
-    private static int ScanTimeout() => ScanTimeoutMilliseconds(Plugin.Instance?.Configuration.ScanTimeoutSeconds ?? 300);
+    private static int ScanTimeout() => ScanTimeoutMilliseconds(ConfigOverride?.ScanTimeoutSeconds ?? 300);
 
     private static string GetFFprobePath()
     {
@@ -1319,7 +1319,7 @@ internal sealed partial class FFmpegService : IFFmpegService
 
         var cacheMode = QueuedEpisode.FingerprintCacheMode(mode);
         var (start, end) = episode.GetFingerprintRange(cacheMode);
-        var configuration = Plugin.Instance?.Configuration;
+        var configuration = ConfigOverride ?? new PluginConfiguration();
         var preferredLanguage = ConfigHasher.NormalizeAudioLanguage(configuration?.PreferredAudioLanguage);
         var streamSelection = await GetAudioStreamSelectionAsync(
             episode,

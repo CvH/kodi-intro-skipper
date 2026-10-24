@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using IntroSkipper.Data;
 using IntroSkipper.Db;
-using IntroSkipper.Providers;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static IntroSkipper.Tests.DatabaseTestHelpers;
@@ -257,12 +256,11 @@ public sealed class TestSegmentTombstones : IDisposable
         var rows = await database.GetSegmentsAsync(itemId);
         await database.DeleteSegmentAsync(itemId, rows[0].Id);
 
-        var factory = new SegmentDtoFactory(database);
-        var dtos = await factory.CreateAsync(itemId, default);
+        var activeRows = await database.GetSegmentsAsync(itemId);
 
-        // Only the surviving active row syncs to Jellyfin — carrying its plugin id.
-        var dto = Assert.Single(dtos);
-        Assert.Equal(rows[1].Id, dto.Id);
-        Assert.Equal(rows[1].StartTicks, dto.StartTicks);
+        // Only the surviving active row is returned — tombstone is hidden.
+        var active = Assert.Single(activeRows);
+        Assert.Equal(rows[1].Id, active.Id);
+        Assert.Equal(rows[1].StartTicks, active.StartTicks);
     }
 }

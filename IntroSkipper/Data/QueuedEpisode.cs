@@ -4,8 +4,6 @@
 // SPDX-FileCopyrightText: 2024-2026 Kilian von Pflugk
 // SPDX-License-Identifier: GPL-3.0-only
 
-using MediaBrowser.Model.Entities;
-
 namespace IntroSkipper.Data;
 
 /// <summary>

@@ -10,7 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using IntroSkipper.Data;
 using IntroSkipper.FFmpeg;
-using MediaBrowser.Model.Entities;
 
 /// <summary>
 /// <see cref="IFFmpegService"/> stand-in for analyzer tests. Each member runs a delegate hook; a

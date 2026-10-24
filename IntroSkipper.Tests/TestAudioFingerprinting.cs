@@ -115,17 +115,25 @@ public class TestAudioFingerprinting
             ]);
         await runner.RunAsync("ffmpeg", ["-y", "-v", "error", "-i", dualTrack, "-map", "0:a:1", "-c", "copy", surroundOnly]);
 
-        using var scope = EntrypointTestHelpers.CreatePluginScope(new PluginConfiguration());
-        var ffmpegService = CreateFFmpegService();
-        var surround = await ffmpegService.FingerprintAsync(QueueAbsolute(surroundOnly), AnalysisMode.Introduction);
-        var episode = QueueAbsolute(dualTrack);
-        var ffmpegPick = await ffmpegService.FingerprintAsync(episode, AnalysisMode.Introduction);
+        var config1 = new PluginConfiguration();
+        FFmpegService.ConfigOverride = config1;
+        try
+        {
+            var ffmpegService = CreateFFmpegService();
+            var surround = await ffmpegService.FingerprintAsync(QueueAbsolute(surroundOnly), AnalysisMode.Introduction);
+            var episode = QueueAbsolute(dualTrack);
+            var ffmpegPick = await ffmpegService.FingerprintAsync(episode, AnalysisMode.Introduction);
 
-        Plugin.Instance!.Configuration.PreferredAudioLanguage = "jpn";
-        var preferred = await ffmpegService.FingerprintAsync(episode, AnalysisMode.Introduction);
+            config1.PreferredAudioLanguage = "jpn";
+            var preferred = await ffmpegService.FingerprintAsync(episode, AnalysisMode.Introduction);
 
-        Assert.NotEqual(surround, ffmpegPick);
-        Assert.Equal(surround, preferred);
+            Assert.NotEqual(surround, ffmpegPick);
+            Assert.Equal(surround, preferred);
+        }
+        finally
+        {
+            FFmpegService.ConfigOverride = null;
+        }
 
         static QueuedEpisode QueueAbsolute(string path) => new() { EpisodeId = Guid.NewGuid(), Path = path, IntroFingerprintEnd = 60 };
     }
@@ -147,19 +155,27 @@ public class TestAudioFingerprinting
         await runner.RunAsync("ffmpeg", ["-y", "-v", "error", "-i", dualTrack, "-map", "0:a:0", "-c", "copy", surroundOnly]);
         await runner.RunAsync("ffmpeg", ["-y", "-v", "error", "-i", dualTrack, "-map", "0:a:1", "-c", "copy", stereoOnly]);
 
-        using var scope = EntrypointTestHelpers.CreatePluginScope(new PluginConfiguration());
-        var ffmpegService = CreateFFmpegService();
-        var episodeId = Guid.NewGuid();
-        var stereo = await ffmpegService.FingerprintAsync(Queue(Guid.NewGuid(), stereoOnly), AnalysisMode.Introduction);
+        var config2 = new PluginConfiguration();
+        FFmpegService.ConfigOverride = config2;
+        try
+        {
+            var ffmpegService = CreateFFmpegService();
+            var episodeId = Guid.NewGuid();
+            var stereo = await ffmpegService.FingerprintAsync(Queue(Guid.NewGuid(), stereoOnly), AnalysisMode.Introduction);
 
-        // The row 12.0 wrote for the dual-track episode with PreferAudioStreamWithMostChannels off: the 5.1 stream under the default variant.
-        var surround = await ffmpegService.FingerprintAsync(Queue(episodeId, surroundOnly), AnalysisMode.Introduction);
+            // The row 12.0 wrote for the dual-track episode with PreferAudioStreamWithMostChannels off: the 5.1 stream under the default variant.
+            var surround = await ffmpegService.FingerprintAsync(Queue(episodeId, surroundOnly), AnalysisMode.Introduction);
 
-        Plugin.Instance!.Configuration.PreferredAudioLanguage = "jpn";
-        var preferred = await ffmpegService.FingerprintAsync(Queue(episodeId, dualTrack), AnalysisMode.Introduction);
+            config2.PreferredAudioLanguage = "jpn";
+            var preferred = await ffmpegService.FingerprintAsync(Queue(episodeId, dualTrack), AnalysisMode.Introduction);
 
-        Assert.NotEqual(surround, stereo);
-        Assert.Equal(stereo, preferred);
+            Assert.NotEqual(surround, stereo);
+            Assert.Equal(stereo, preferred);
+        }
+        finally
+        {
+            FFmpegService.ConfigOverride = null;
+        }
 
         static QueuedEpisode Queue(Guid id, string path) => new() { EpisodeId = id, Path = path, IntroFingerprintEnd = 60 };
     }
@@ -175,21 +191,31 @@ public class TestAudioFingerprinting
         var dualTrack = directory.Join("dual.mkv");
         await WriteSurroundThenDefaultStereoAsync(dualTrack);
 
-        using var scope = EntrypointTestHelpers.CreatePluginScope(new PluginConfiguration { PreferredAudioLanguage = "jpn" });
-        var cacheDatabase = DatabaseTestHelpers.CreateCacheDatabase(scope.CacheDbPath);
-        var ffmpegService = new FFmpegService(NullLogger<FFmpegService>.Instance, new DetectionCacheService(NullLogger<DetectionCacheService>.Instance, cacheDatabase));
-        var episode = new QueuedEpisode { EpisodeId = Guid.NewGuid(), Path = dualTrack, IntroFingerprintEnd = 60 };
-        uint[] legacy = [111u, 222u, 333u];
-        cacheDatabase.Upsert(
-            episode.EpisodeId,
-            AnalysisMode.Introduction,
-            CacheEntryType.Chromaprint,
-            0,
-            60,
-            DetectionCacheService.CompressBrotli(legacy),
-            ConfigHasher.LegacyChromaprintCacheWithoutLanguage(Plugin.Instance!.Configuration, AnalysisMode.Introduction));
+        var config3 = new PluginConfiguration { PreferredAudioLanguage = "jpn" };
+        FFmpegService.ConfigOverride = config3;
+        var cacheDbPath = DatabaseTestHelpers.CreateTempCacheDbPath();
+        try
+        {
+            var cacheDatabase = DatabaseTestHelpers.CreateCacheDatabase(cacheDbPath);
+            var ffmpegService = new FFmpegService(NullLogger<FFmpegService>.Instance, new DetectionCacheService(NullLogger<DetectionCacheService>.Instance, cacheDatabase, config3));
+            var episode = new QueuedEpisode { EpisodeId = Guid.NewGuid(), Path = dualTrack, IntroFingerprintEnd = 60 };
+            uint[] legacy = [111u, 222u, 333u];
+            cacheDatabase.Upsert(
+                episode.EpisodeId,
+                AnalysisMode.Introduction,
+                CacheEntryType.Chromaprint,
+                0,
+                60,
+                DetectionCacheService.CompressBrotli(legacy),
+                ConfigHasher.LegacyChromaprintCacheWithoutLanguage(config3, AnalysisMode.Introduction));
 
-        Assert.Equal(legacy, await ffmpegService.FingerprintAsync(episode, AnalysisMode.Introduction));
+            Assert.Equal(legacy, await ffmpegService.FingerprintAsync(episode, AnalysisMode.Introduction));
+        }
+        finally
+        {
+            FFmpegService.ConfigOverride = null;
+            DatabaseTestHelpers.DeleteSqliteFiles(cacheDbPath);
+        }
     }
 
     /// <summary>
@@ -329,9 +355,53 @@ public class TestAudioFingerprinting
 
 public sealed class FactSkipFFmpegTests : FactAttribute
 {
+    internal static readonly bool FfmpegAvailable = CheckFfmpeg();
+
+    public FactSkipFFmpegTests()
+    {
 #if SKIP_FFMPEG_TESTS
-    public FactSkipFFmpegTests() {
         Skip = "SKIP_FFMPEG_TESTS defined, skipping unit tests that require FFmpeg to be installed";
-    }
+#else
+        if (!FfmpegAvailable)
+        {
+            Skip = "ffmpeg is not available, skipping tests requiring ffmpeg";
+        }
 #endif
+    }
+
+    private static bool CheckFfmpeg()
+    {
+        try
+        {
+            using var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "ffmpeg",
+                Arguments = "-version",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            return proc != null && proc.WaitForExit(1000);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}
+
+public sealed class TheorySkipFFmpegTests : TheoryAttribute
+{
+    public TheorySkipFFmpegTests()
+    {
+#if SKIP_FFMPEG_TESTS
+        Skip = "SKIP_FFMPEG_TESTS defined, skipping unit tests that require FFmpeg to be installed";
+#else
+        if (!FactSkipFFmpegTests.FfmpegAvailable)
+        {
+            Skip = "ffmpeg is not available, skipping tests requiring ffmpeg";
+        }
+#endif
+    }
 }

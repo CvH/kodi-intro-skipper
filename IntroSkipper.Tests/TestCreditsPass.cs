@@ -16,7 +16,6 @@ using IntroSkipper.Db;
 using IntroSkipper.FFmpeg;
 using IntroSkipper.Helper;
 using IntroSkipper.Manager;
-using MediaBrowser.Model.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -1104,8 +1103,12 @@ public sealed class TestCreditsPass
 
     private static double PointTime(int point) => WindowStart + (point * ChromaprintConstants.SampleDuration);
 
-    private static IDisposable Scope()
-        => EntrypointTestHelpers.CreatePluginScope(new PluginConfiguration());
+    private sealed class DummyScope : IDisposable
+    {
+        public void Dispose() { }
+    }
+
+    private static IDisposable Scope() => new DummyScope();
 
     private static ChapterInfo Chapter(string name, double start)
         => new() { Name = name, StartPositionTicks = TimeSpan.FromSeconds(start).Ticks };

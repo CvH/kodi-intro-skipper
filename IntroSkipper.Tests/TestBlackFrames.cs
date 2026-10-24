@@ -17,7 +17,6 @@ using IntroSkipper.Analyzers.Credits;
 using IntroSkipper.Configuration;
 using IntroSkipper.Data;
 using IntroSkipper.FFmpeg;
-using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 using static IntroSkipper.Tests.BlackFrameFixtures;

@@ -43,7 +43,7 @@ public sealed class TestCacheOperations
         };
         foreach (var (entryMode, type, start, end) in entries)
         {
-            scope.SeedRow(itemId, entryMode, type, EntrypointTestHelpers.EmptyJsonArray, start, end);
+            scope.SeedRow(itemId, entryMode, type, DatabaseTestHelpers.EmptyJsonArray, start, end);
         }
 
         var deleted = await scope.CacheDatabase.DeleteByModeAsync(mode);
@@ -207,7 +207,7 @@ public sealed class TestCacheOperations
             600,
             scope.LegacyHash(AnalysisMode.Introduction));
 
-        Plugin.Instance!.Configuration.MaximumFingerprintPointDifferences++;
+        scope.Config.MaximumFingerprintPointDifferences++;
 
         var result = await scope.CreateFFmpegService().FingerprintAsync(episode, AnalysisMode.Introduction);
 
@@ -278,7 +278,7 @@ public sealed class TestCacheOperations
         using var scope = new CachingPluginScope();
         if (seedRow)
         {
-            scope.SeedRow(episode.EpisodeId, QueuedEpisode.FingerprintCacheMode(mode), CacheEntryType.Chromaprint, EntrypointTestHelpers.EmptyJsonArray, rowStart, rowEnd);
+            scope.SeedRow(episode.EpisodeId, QueuedEpisode.FingerprintCacheMode(mode), CacheEntryType.Chromaprint, DatabaseTestHelpers.EmptyJsonArray, rowStart, rowEnd);
         }
 
         Assert.Equal(expected, scope.CacheService.HasCachedFingerprint(episode, mode));
@@ -293,7 +293,7 @@ public sealed class TestCacheOperations
     {
         var episode = new QueuedEpisode { EpisodeId = Guid.NewGuid(), IntroFingerprintEnd = 600 };
         using var scope = new CachingPluginScope();
-        scope.SeedRow(episode.EpisodeId, rowMode, CacheEntryType.Chromaprint, EntrypointTestHelpers.EmptyJsonArray, 0, 600, scope.LegacyHash(rowMode));
+        scope.SeedRow(episode.EpisodeId, rowMode, CacheEntryType.Chromaprint, DatabaseTestHelpers.EmptyJsonArray, 0, 600, scope.LegacyHash(rowMode));
 
         Assert.True(scope.CacheService.HasCachedFingerprint(episode, mode));
     }
@@ -310,7 +310,7 @@ public sealed class TestCacheOperations
     {
         using var scope = new CachingPluginScope();
         var legacyHash = scope.LegacyHash(AnalysisMode.Introduction);
-        var currentHash = ConfigHasher.DetectionCache(Plugin.Instance!.Configuration, CacheEntryType.Chromaprint, AnalysisMode.Introduction, MostChannelsStreamCacheVariant);
+        var currentHash = ConfigHasher.DetectionCache(scope.Config, CacheEntryType.Chromaprint, AnalysisMode.Introduction, MostChannelsStreamCacheVariant);
 
         // Twenty shared intro points (about 2.5 s) followed by twenty points unique to the episode.
         static uint[] Points(uint intro, uint unique)
@@ -374,7 +374,7 @@ public sealed class TestCacheOperations
     public async Task AnalyzeMediaFiles_KeepsChapterIntroOfSettledSibling()
     {
         using var scope = new CachingPluginScope();
-        var hash = ConfigHasher.DetectionCache(Plugin.Instance!.Configuration, CacheEntryType.Chromaprint, AnalysisMode.Introduction, MostChannelsStreamCacheVariant);
+        var hash = ConfigHasher.DetectionCache(scope.Config, CacheEntryType.Chromaprint, AnalysisMode.Introduction, MostChannelsStreamCacheVariant);
         var database = DatabaseTestHelpers.CreateTempSegmentDatabase();
 
         var episodes = new List<QueuedEpisode>();
@@ -432,18 +432,18 @@ public sealed class TestCacheOperations
     {
         var itemId = Guid.NewGuid();
         using var scope = new CachingPluginScope();
-        var config = Plugin.Instance!.Configuration;
+        var config = scope.Config;
         var cacheDatabase = scope.CacheDatabase;
 
         // One row per acceptance path, distinguished by their range keys, plus one settings-
         // sensitive row whose hash no read path accepts.
-        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 100, EntrypointTestHelpers.EmptyJsonArray, ConfigHasher.DetectionCache(config, CacheEntryType.Chromaprint, AnalysisMode.Introduction));
-        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 200, EntrypointTestHelpers.EmptyJsonArray, scope.LegacyHash(AnalysisMode.Introduction));
-        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 300, EntrypointTestHelpers.EmptyJsonArray, ConfigHasher.DetectionCache(config, CacheEntryType.Chromaprint, AnalysisMode.Introduction, MostChannelsStreamCacheVariant));
-        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 400, EntrypointTestHelpers.EmptyJsonArray, string.Empty);
-        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Silence, 0, 500, EntrypointTestHelpers.EmptyJsonArray, ConfigHasher.DetectionCache(config, CacheEntryType.Silence, AnalysisMode.Introduction));
+        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 100, DatabaseTestHelpers.EmptyJsonArray, ConfigHasher.DetectionCache(config, CacheEntryType.Chromaprint, AnalysisMode.Introduction));
+        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 200, DatabaseTestHelpers.EmptyJsonArray, scope.LegacyHash(AnalysisMode.Introduction));
+        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 300, DatabaseTestHelpers.EmptyJsonArray, ConfigHasher.DetectionCache(config, CacheEntryType.Chromaprint, AnalysisMode.Introduction, MostChannelsStreamCacheVariant));
+        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 400, DatabaseTestHelpers.EmptyJsonArray, string.Empty);
+        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Silence, 0, 500, DatabaseTestHelpers.EmptyJsonArray, ConfigHasher.DetectionCache(config, CacheEntryType.Silence, AnalysisMode.Introduction));
         // An unknown fingerprint hash is not a recognized cache format and is removed.
-        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 600, EntrypointTestHelpers.EmptyJsonArray, "0123456789ABCDEF");
+        cacheDatabase.Upsert(itemId, AnalysisMode.Introduction, CacheEntryType.Chromaprint, 0, 600, DatabaseTestHelpers.EmptyJsonArray, "0123456789ABCDEF");
 
         var deleted = await scope.CacheService.DeleteUnreadableEntriesAsync();
 
@@ -676,7 +676,7 @@ public sealed class TestCacheOperations
         using var scope = new CachingPluginScope();
 
         // Slice threads take the wavefront path only with more than one thread.
-        Plugin.Instance!.Configuration.ProcessThreads = 2;
+        scope.Config.ProcessThreads = 2;
         var episode = FfmpegTestHelpers.QueueFile("video/hevc-broken-wavefronts.mkv");
         episode.Duration = 1;
         episode.CreditsFingerprintStart = 0;
@@ -757,20 +757,24 @@ public sealed class TestCacheOperations
     /// </summary>
     private sealed class CachingPluginScope : IDisposable
     {
-        private readonly EntrypointTestHelpers.PluginInstanceScope _inner;
+        private readonly string _cacheDbPath;
 
-        public CachingPluginScope()
+        public CachingPluginScope(PluginConfiguration? config = null)
         {
-            _inner = EntrypointTestHelpers.CreatePluginScope(new PluginConfiguration());
-            CacheDatabase = DatabaseTestHelpers.CreateCacheDatabase(_inner.CacheDbPath);
-            CacheService = new DetectionCacheService(NullLogger<DetectionCacheService>.Instance, CacheDatabase);
+            Config = config ?? new PluginConfiguration();
+            FFmpegService.ConfigOverride = Config;
+            _cacheDbPath = DatabaseTestHelpers.CreateTempCacheDbPath();
+            CacheDatabase = DatabaseTestHelpers.CreateCacheDatabase(_cacheDbPath);
+            CacheService = new DetectionCacheService(NullLogger<DetectionCacheService>.Instance, CacheDatabase, Config);
         }
+
+        public PluginConfiguration Config { get; }
 
         public DetectionCacheDatabase CacheDatabase { get; }
 
         public DetectionCacheService CacheService { get; }
 
-        public string CacheDbPath => _inner.CacheDbPath;
+        public string CacheDbPath => _cacheDbPath;
 
         public FFmpegService CreateFFmpegService(ILogger<FFmpegService>? logger = null) => new(logger ?? NullLogger<FFmpegService>.Instance, CacheService);
 
@@ -779,7 +783,7 @@ public sealed class TestCacheOperations
         /// Chromaprint rows.
         /// </summary>
         public string LegacyHash(AnalysisMode mode)
-            => ConfigHasher.LegacyChromaprintCacheWithoutLanguage(Plugin.Instance!.Configuration, mode);
+            => ConfigHasher.LegacyChromaprintCacheWithoutLanguage(Config, mode);
 
         /// <summary>
         /// Stores one raw cache row. Pass the bytes a read path expects (Brotli for
@@ -788,6 +792,10 @@ public sealed class TestCacheOperations
         public void SeedRow(Guid itemId, AnalysisMode mode, CacheEntryType type, byte[] data, double start = 0, double end = 0, string configHash = "")
             => CacheDatabase.Upsert(itemId, mode, type, start, end, data, configHash);
 
-        public void Dispose() => _inner.Dispose();
+        public void Dispose()
+        {
+            FFmpegService.ConfigOverride = null;
+            DatabaseTestHelpers.DeleteSqliteFiles(_cacheDbPath);
+        }
     }
 }

@@ -34,7 +34,7 @@ public sealed partial class TestDocReferences
     private static readonly Lazy<RepoIndex> Index = new(BuildIndex);
 
     // Plugin types by simple name, nested and non-public ones included.
-    private static readonly ILookup<string, Type> PluginTypes = typeof(Plugin).Assembly.GetTypes().ToLookup(type => type.Name, StringComparer.Ordinal);
+    private static readonly ILookup<string, Type> PluginTypes = typeof(IntroSkipper.Configuration.PluginConfiguration).Assembly.GetTypes().ToLookup(type => type.Name, StringComparer.Ordinal);
 
     // The docs agents navigate by. The other files in docs/ are how-tos about the Jellyfin
     // server and name its files, which this repo does not hold.

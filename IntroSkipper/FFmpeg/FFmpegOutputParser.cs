@@ -8,7 +8,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using IntroSkipper.Data;
 using IntroSkipper.Helper;
-using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace IntroSkipper.FFmpeg;

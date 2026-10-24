@@ -12,18 +12,13 @@ using System.Threading.Tasks;
 using IntroSkipper.Data;
 using IntroSkipper.Db;
 using IntroSkipper.FFmpeg;
-using IntroSkipper.Manager;
-using IntroSkipper.Providers;
-using IntroSkipper.SegmentChanges;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
 /// <summary>
 /// Helpers for constructing the database facades in tests over explicit temp-file
-/// SQLite paths. Tests that scope <see cref="Plugin.Instance"/> via
-/// <see cref="EntrypointTestHelpers.PluginInstanceScope"/> pass the scope's cache
-/// database path (<c>scope.CacheDbPath</c>) explicitly.
+/// SQLite paths.
 /// </summary>
 internal static class DatabaseTestHelpers
 {
@@ -57,29 +52,7 @@ internal static class DatabaseTestHelpers
     internal static IntroSkipperDatabase CreateTempSegmentDatabase()
         => CreateSegmentDatabase(CreateTempDbPath(Guid.NewGuid().ToString("N") + ".db"));
 
-    /// <summary>
-    /// Composes the standard mirror over a store and database, the single test home of
-    /// the mirror wiring so constructor changes touch one place. Without an explicit
-    /// policy the mirror follows the plugin configuration, as in production, or is
-    /// simply enabled when the test hosts no plugin instance.
-    /// </summary>
-    internal static MediaSegmentMirror CreateMirror(IJellyfinSegmentStore store, IntroSkipperDatabase database, IMediaSegmentMirrorPolicy? policy = null)
-        => new(store, new SegmentDtoFactory(database), policy ?? DefaultPolicy(), NullLogger<MediaSegmentMirror>.Instance);
-
-    private static IMediaSegmentMirrorPolicy DefaultPolicy()
-        => Plugin.Instance is null ? new FakeMirrorPolicy() : new MediaSegmentMirrorPolicy();
-
-    /// <summary>
-    /// Composes the durable segment-change coordinator over the real mirror, the
-    /// single test home of the production composition chain so constructor changes
-    /// touch one place. Callers get end-to-end behavior: intent commit, journal, and
-    /// mirror convergence against the given store.
-    /// </summary>
-    internal static SegmentChange CreateSegmentChange(IJellyfinSegmentStore store, IntroSkipperDatabase database, IMediaSegmentMirrorPolicy? policy = null)
-    {
-        policy ??= DefaultPolicy();
-        return new(database, CreateMirror(store, database, policy), policy, TimeProvider.System, NullLogger<SegmentChange>.Instance);
-    }
+    internal static readonly byte[] EmptyJsonArray = "[]"u8.ToArray();
 
     /// <summary>
     /// Converts seconds to ticks for test fixtures; shared so per-file shims are unneeded.

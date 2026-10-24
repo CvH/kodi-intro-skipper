@@ -83,6 +83,7 @@ var app = builder.Build();
 // Wire Kodi VFS path resolution and activity tracking into FFmpegService
 var kodiBridge = app.Services.GetRequiredService<KodiVfsBridge>();
 FFmpegService.PathResolver = kodiBridge.BuildVfsUrl;
+FFmpegService.ConfigOverride = app.Services.GetRequiredService<PluginConfiguration>();
 
 var progressTracker = app.Services.GetRequiredService<ScanProgressTracker>();
 FFmpegService.ActivityReporter = (path, activity) =>

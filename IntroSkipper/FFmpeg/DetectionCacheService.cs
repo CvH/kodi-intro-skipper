@@ -5,6 +5,7 @@
 using System.Data.Common;
 using System.IO.Compression;
 using System.Text.Json;
+using IntroSkipper.Configuration;
 using IntroSkipper.Data;
 using IntroSkipper.Db;
 using IntroSkipper.Helper;
@@ -23,10 +24,15 @@ namespace IntroSkipper.FFmpeg;
 /// </remarks>
 /// <param name="logger">The logger instance.</param>
 /// <param name="cacheDatabase">The detection cache database facade.</param>
-public sealed partial class DetectionCacheService(ILogger<DetectionCacheService> logger, DetectionCacheDatabase cacheDatabase)
+/// <param name="config">Optional configuration instance.</param>
+public sealed partial class DetectionCacheService(
+    ILogger<DetectionCacheService> logger,
+    DetectionCacheDatabase cacheDatabase,
+    PluginConfiguration? config = null)
 {
     private readonly ILogger<DetectionCacheService> _logger = logger;
     private readonly DetectionCacheDatabase _cacheDatabase = cacheDatabase;
+    private readonly PluginConfiguration _config = config ?? new();
 
     /// <summary>
     /// Tries to read a cached detection result from the SQLite DB.
@@ -65,7 +71,7 @@ public sealed partial class DetectionCacheService(ILogger<DetectionCacheService>
                 return false;
             }
 
-            var expectedHash = ConfigHasher.DetectionCache(Plugin.Instance?.Configuration ?? new(), type, mode, cacheVariant);
+            var expectedHash = ConfigHasher.DetectionCache(_config, type, mode, cacheVariant);
             var hashMatches = string.IsNullOrEmpty(entry.ConfigHash)
                 || string.Equals(entry.ConfigHash, expectedHash, StringComparison.Ordinal)
                 || string.Equals(entry.ConfigHash, legacyConfigHash, StringComparison.Ordinal);
@@ -118,7 +124,7 @@ public sealed partial class DetectionCacheService(ILogger<DetectionCacheService>
         string? cacheVariant = null)
     {
         var data = CompressBrotli(items);
-        var configHash = ConfigHasher.DetectionCache(Plugin.Instance?.Configuration ?? new(), type, mode, cacheVariant);
+        var configHash = ConfigHasher.DetectionCache(_config, type, mode, cacheVariant);
 
         try
         {
@@ -183,7 +189,7 @@ public sealed partial class DetectionCacheService(ILogger<DetectionCacheService>
     /// <returns>The number of deleted rows; 0 when the delete failed.</returns>
     public async Task<int> DeleteUnreadableEntriesAsync(CancellationToken cancellationToken = default)
     {
-        var config = Plugin.Instance?.Configuration ?? new();
+        var config = _config;
 
         // Every hash some read path accepts under the current configuration: the current
         // hash of each (type, mode) pair plus the legacy pre-stream-selection Chromaprint
@@ -212,7 +218,7 @@ public sealed partial class DetectionCacheService(ILogger<DetectionCacheService>
     /// <returns>The Brotli-compressed data.</returns>
     internal static byte[] CompressBrotli<T>(T value)
     {
-        var level = Plugin.Instance?.Configuration.CacheCompressionLevel ?? CompressionLevel.Optimal;
+        var level = CompressionLevel.Optimal;
         using var output = new MemoryStream();
         using (var brotli = new BrotliStream(output, level))
         {

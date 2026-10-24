@@ -3,8 +3,6 @@
 
 using IntroSkipper.Data;
 using IntroSkipper.SegmentChanges;
-using Jellyfin.Database.Implementations.Enums;
-using MediaBrowser.Model.MediaSegments;
 using Microsoft.EntityFrameworkCore;
 
 namespace IntroSkipper.Db;

@@ -233,7 +233,7 @@ public sealed class StandaloneAnalyzer(
         }
     }
 
-    private async Task<(double Duration, IReadOnlyList<MediaBrowser.Model.Entities.ChapterInfo> Chapters)> ProbeMediaAsync(
+    private async Task<(double Duration, IReadOnlyList<ChapterInfo> Chapters)> ProbeMediaAsync(
         string filePath,
         Guid episodeId,
         CancellationToken cancellationToken)

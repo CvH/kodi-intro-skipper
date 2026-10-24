@@ -1,20 +1,17 @@
 // SPDX-FileCopyrightText: 2026 rlauuzo
 // SPDX-FileCopyrightText: 2026 AbandonedCart
+// SPDX-FileCopyrightText: 2026 CvH
 // SPDX-License-Identifier: GPL-3.0-only
-
-using MediaBrowser.Common.Configuration;
 
 namespace IntroSkipper.Db;
 
 /// <summary>
-/// Single source of truth for the plugin's database file locations, shared by the
-/// plugin constructor and the dependency-injection registrations so the two can
-/// never diverge.
+/// Single source of truth for the database file locations.
 /// </summary>
 internal static class IntroSkipperDatabasePaths
 {
     /// <summary>
-    /// Name of the plugin data directory below <see cref="IApplicationPaths.DataPath"/>.
+    /// Name of the data directory below base path.
     /// </summary>
     internal const string PluginDirectoryName = "introskipper";
 
@@ -25,8 +22,7 @@ internal static class IntroSkipperDatabasePaths
 
     /// <summary>
     /// File name of the legacy segment database. Read once (read-only) by
-    /// <see cref="LegacyDatabaseImporter"/> and never modified, so downgrading
-    /// to a pre-v2 plugin keeps working.
+    /// <see cref="LegacyDatabaseImporter"/> and never modified.
     /// </summary>
     internal const string LegacySegmentDatabaseFileName = "introskipper.db";
 
@@ -36,15 +32,13 @@ internal static class IntroSkipperDatabasePaths
     internal const string DetectionCacheDatabaseFileName = "introskipper-cache.db";
 
     /// <summary>
-    /// Returns the plugin data directory, creating it when missing.
+    /// Returns the data directory, creating it when missing.
     /// </summary>
-    /// <param name="applicationPaths">Application paths.</param>
-    /// <returns>The plugin data directory.</returns>
-    internal static string GetPluginDirectory(IApplicationPaths applicationPaths)
+    /// <param name="baseDataPath">Base data path.</param>
+    /// <returns>The data directory.</returns>
+    internal static string GetPluginDirectory(string baseDataPath)
     {
-        var directory = Path.Join(applicationPaths.DataPath, PluginDirectoryName);
-
-        // Directory.CreateDirectory is a no-op when the directory already exists.
+        var directory = Path.Join(baseDataPath, PluginDirectoryName);
         Directory.CreateDirectory(directory);
         return directory;
     }
@@ -52,10 +46,10 @@ internal static class IntroSkipperDatabasePaths
     /// <summary>
     /// Returns the full path of the segment database, creating the containing directory when missing.
     /// </summary>
-    /// <param name="applicationPaths">Application paths.</param>
+    /// <param name="baseDataPath">Base data path.</param>
     /// <returns>The segment database path.</returns>
-    internal static string GetSegmentDatabasePath(IApplicationPaths applicationPaths)
-        => Path.Join(GetPluginDirectory(applicationPaths), SegmentDatabaseFileName);
+    internal static string GetSegmentDatabasePath(string baseDataPath)
+        => Path.Join(GetPluginDirectory(baseDataPath), SegmentDatabaseFileName);
 
     /// <summary>
     /// Returns the legacy segment database path that sits next to the given current
@@ -69,8 +63,8 @@ internal static class IntroSkipperDatabasePaths
     /// <summary>
     /// Returns the full path of the detection cache database, creating the containing directory when missing.
     /// </summary>
-    /// <param name="applicationPaths">Application paths.</param>
+    /// <param name="baseDataPath">Base data path.</param>
     /// <returns>The detection cache database path.</returns>
-    internal static string GetDetectionCacheDatabasePath(IApplicationPaths applicationPaths)
-        => Path.Join(GetPluginDirectory(applicationPaths), DetectionCacheDatabaseFileName);
+    internal static string GetDetectionCacheDatabasePath(string baseDataPath)
+        => Path.Join(GetPluginDirectory(baseDataPath), DetectionCacheDatabaseFileName);
 }

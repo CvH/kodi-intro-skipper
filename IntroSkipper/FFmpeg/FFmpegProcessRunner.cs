@@ -114,7 +114,7 @@ internal sealed partial class FFmpegProcessRunner(ILogger logger)
         {
             try
             {
-                process.PriorityClass = Plugin.Instance?.Configuration.ProcessPriority ?? ProcessPriorityClass.BelowNormal;
+                process.PriorityClass = FFmpegService.ConfigOverride?.ProcessPriority ?? ProcessPriorityClass.BelowNormal;
             }
             catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
             {

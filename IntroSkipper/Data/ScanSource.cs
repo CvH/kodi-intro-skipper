@@ -10,4 +10,13 @@ namespace IntroSkipper.Data;
 /// <param name="Path">Filesystem or network share path.</param>
 /// <param name="Enabled">Whether this source is currently enabled for automatic scanning.</param>
 /// <param name="ContentType">Kodi or library content type (e.g. "tvshows", "movies", "unset").</param>
-public sealed record ScanSource(string Name, string Path, bool Enabled, string ContentType = "tvshows");
+public sealed record ScanSource(string Name, string Path, bool Enabled, string ContentType = "tvshows")
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ScanSource"/> class.
+    /// </summary>
+    public ScanSource()
+        : this(string.Empty, string.Empty, true, "tvshows")
+    {
+    }
+}
