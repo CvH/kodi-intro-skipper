@@ -11,6 +11,13 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- Default Kodi Addon identifier and filesystem layout -->
+    <DefaultAddonId Condition="'$(DefaultAddonId)' == ''">service.introskipper</DefaultAddonId>
+    <DefaultAddonDir Condition="'$(DefaultAddonDir)' == ''">/storage/.kodi/addons/$(DefaultAddonId)</DefaultAddonDir>
+    <DefaultDataDir Condition="'$(DefaultDataDir)' == ''">/storage/.kodi/userdata/addon_data/$(DefaultAddonId)</DefaultDataDir>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.13" />
@@ -23,5 +30,32 @@
   <ItemGroup>
     <EmbeddedResource Include="Web/Fonts/inter.woff2" />
   </ItemGroup>
+
+  <Target Name="GeneratePathDefaults" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <PathDefaultsContent>
+// &lt;auto-generated /&gt;
+#nullable enable
+
+namespace IntroSkipper.Server%3B
+
+/// &lt;summary&gt;
+/// Build-time configured path defaults.
+/// &lt;/summary&gt;
+internal static class PathDefaults
+{
+    public const string DefaultAddonId = "$(DefaultAddonId)"%3B
+    public const string DefaultAddonDir = "$(DefaultAddonDir)"%3B
+    public const string DefaultDataDir = "$(DefaultDataDir)"%3B
+}
+      </PathDefaultsContent>
+      <GeneratedPathDefaultsFile>$(IntermediateOutputPath)PathDefaults.g.cs</GeneratedPathDefaultsFile>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(GeneratedPathDefaultsFile)" Lines="$(PathDefaultsContent)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Compile Include="$(GeneratedPathDefaultsFile)" />
+      <FileWrites Include="$(GeneratedPathDefaultsFile)" />
+    </ItemGroup>
+  </Target>
 
 </Project>

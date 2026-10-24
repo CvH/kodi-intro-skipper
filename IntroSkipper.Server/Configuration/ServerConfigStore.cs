@@ -30,13 +30,24 @@ public sealed class ServerConfigStore
     /// <summary>
     /// Initializes a new instance of the <see cref="ServerConfigStore"/> class.
     /// </summary>
-    /// <param name="storage">Server storage provider containing data directory.</param>
+    /// <param name="paths">Server path provider.</param>
+    /// <param name="logger">Logger instance.</param>
+    public ServerConfigStore(ServerPaths paths, ILogger<ServerConfigStore> logger)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        _logger = logger;
+        _configFilePath = paths.ConfigFilePath;
+        Current = LoadOrCreateDefault();
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ServerConfigStore"/> class.
+    /// </summary>
+    /// <param name="storage">Server storage provider containing path provider.</param>
     /// <param name="logger">Logger instance.</param>
     public ServerConfigStore(ServerStorage storage, ILogger<ServerConfigStore> logger)
+        : this(storage?.Paths ?? new ServerPaths(storage?.DataDirectory), logger)
     {
-        _logger = logger;
-        _configFilePath = Path.Combine(storage.DataDirectory, "config.json");
-        Current = LoadOrCreateDefault();
     }
 
     /// <summary>
@@ -58,6 +69,12 @@ public sealed class ServerConfigStore
         {
             try
             {
+                var dir = Path.GetDirectoryName(_configFilePath);
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
                 var json = JsonSerializer.Serialize(Current, JsonOptions);
                 File.WriteAllText(_configFilePath, json);
                 _logger.LogInformation("IntroSkipper configuration saved to {Path}", _configFilePath);
@@ -387,6 +404,12 @@ public sealed class ServerConfigStore
             var defaultConfig = new PluginConfiguration();
             try
             {
+                var dir = Path.GetDirectoryName(_configFilePath);
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
                 var json = JsonSerializer.Serialize(defaultConfig, JsonOptions);
                 File.WriteAllText(_configFilePath, json);
                 _logger.LogInformation("Initialized default configuration at {Path}", _configFilePath);

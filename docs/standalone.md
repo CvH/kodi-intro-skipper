@@ -22,14 +22,61 @@ Build the executable from the repository root:
 dotnet build IntroSkipper.Server/IntroSkipper.Server.csproj -c Release
 ```
 
-To create a self-contained, single-file binary for deployment:
+### Build-Time Configurable Paths
+
+IntroSkipper defaults to a structured Kodi service add-on layout, but paths can be customized at build/publish time via MSBuild properties:
+
+| MSBuild Property | Default Value | Description |
+|---|---|---|
+| `DefaultAddonId` | `service.introskipper` | Service add-on identifier |
+| `DefaultAddonDir` | `/storage/.kodi/addons/$(DefaultAddonId)` | Addon installation folder (where `bin/` resides) |
+| `DefaultDataDir` | `/storage/.kodi/userdata/addon_data/$(DefaultAddonId)` | Base userdata folder (where `db/`, `logs/`, `config/` reside) |
+
+#### Publishing Self-Contained Single-File Binaries
 
 ```bash
-# Linux x64
-dotnet publish IntroSkipper.Server/IntroSkipper.Server.csproj -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -o publish/linux-x64
+# Linux ARM64 (e.g. LibreELEC on Raspberry Pi / Odroid) with default paths
+dotnet publish IntroSkipper.Server/IntroSkipper.Server.csproj -c Release -r linux-arm64 \
+  --self-contained -p:PublishSingleFile=true -o publish/linux-arm64
+
+# Linux x64 with custom userdata path
+dotnet publish IntroSkipper.Server/IntroSkipper.Server.csproj -c Release -r linux-x64 \
+  --self-contained -p:PublishSingleFile=true \
+  -p:DefaultAddonId=service.introskipper \
+  -p:DefaultDataDir=/var/lib/introskipper \
+  -o publish/linux-x64
 
 # Windows x64
-dotnet publish IntroSkipper.Server/IntroSkipper.Server.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish/win-x64
+dotnet publish IntroSkipper.Server/IntroSkipper.Server.csproj -c Release -r win-x64 \
+  --self-contained -p:PublishSingleFile=true -o publish/win-x64
+```
+
+---
+
+## Directory & Subfolder Layout
+
+When running with default paths on Kodi / LibreELEC, files are organized into dedicated subfolders:
+
+```
+/storage/.kodi/
+├── addons/service.introskipper/
+│   ├── addon.xml
+│   ├── service.py, main.py, sources.py, context.py
+│   ├── resources/
+│   └── bin/
+│       ├── IntroSkipper.Server    <-- Standalone server executable
+│       ├── ffmpeg                 <-- FFmpeg binary with Chromaprint
+│       └── ffprobe                <-- FFprobe binary
+│
+└── userdata/addon_data/service.introskipper/
+    ├── db/
+    │   ├── introskipper.db        <-- SQLite segment boundaries & metadata
+    │   └── introskipper-cache.db  <-- Raw fingerprint & detection cache
+    ├── logs/
+    │   └── server.log             <-- Application server log
+    └── config/
+        ├── config.json            <-- Detection rules & server settings
+        └── scan_sources.json      <-- Configured scan sources
 ```
 
 ---
@@ -45,8 +92,8 @@ Available command-line flags and environment variables:
 
 | Parameter | Environment Variable | Default | Description |
 |---|---|---|---|
-| `--data-dir <path>` | `INTROSKIPPER_DATA_DIR` | Binary folder (`AppContext.BaseDirectory`) | Directory where SQLite databases are saved |
-| `--ffmpeg-path <path>` | `INTROSKIPPER_FFMPEG_PATH` | `ffmpeg` on `PATH` | Path to `ffmpeg` binary with chromaprint support |
+| `--data-dir <path>` | `INTROSKIPPER_DATA_DIR` | `/storage/.kodi/userdata/addon_data/service.introskipper/` | Base directory for `db/`, `logs/`, and `config/` |
+| `--ffmpeg-path <path>` | `INTROSKIPPER_FFMPEG_PATH` | `bin/ffmpeg` or `PATH` | Path to `ffmpeg` binary with chromaprint support |
 | `--port <port>` | `PORT` | `8037` | HTTP port to listen on |
 | `--urls <urls>` | `ASPNETCORE_URLS` | `http://0.0.0.0:8037` | Server URL bindings |
 

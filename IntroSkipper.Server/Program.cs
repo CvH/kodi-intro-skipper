@@ -41,17 +41,19 @@ for (var i = 0; i < args.Length; i++)
     }
 }
 
+var paths = new ServerPaths(dataDir);
+paths.EnsureDirectoriesCreated();
+
 if (!string.IsNullOrWhiteSpace(ffmpegPath))
 {
     FFmpegService.CustomFFmpegPath = ffmpegPath;
 }
 
-// Ensure server.log is written to data directory or current working directory
-var logDir = dataDir ?? Directory.GetCurrentDirectory();
-var logPath = Path.Combine(logDir, "server.log");
-var fileLogger = new ServerFileLoggerProvider(logPath);
+// Ensure server.log is written to the dedicated logs subfolder
+var fileLogger = new ServerFileLoggerProvider(paths.LogFilePath);
 builder.Logging.AddProvider(fileLogger);
 builder.Services.AddSingleton(fileLogger);
+builder.Services.AddSingleton(paths);
 
 // Ensure Kestrel listens on configured port if no urls specified
 if (builder.Configuration["urls"] is null && Environment.GetEnvironmentVariable("ASPNETCORE_URLS") is null)
@@ -60,7 +62,7 @@ if (builder.Configuration["urls"] is null && Environment.GetEnvironmentVariable(
 }
 
 // Register Services
-builder.Services.AddSingleton(sp => new ServerStorage(dataDir, sp.GetRequiredService<ILoggerFactory>()));
+builder.Services.AddSingleton(sp => new ServerStorage(paths, sp.GetRequiredService<ILoggerFactory>()));
 builder.Services.AddSingleton(sp => sp.GetRequiredService<ServerStorage>().Database);
 builder.Services.AddSingleton(sp => sp.GetRequiredService<ServerStorage>().CacheDatabase);
 builder.Services.AddSingleton(sp => new DetectionCacheService(
@@ -71,7 +73,7 @@ builder.Services.AddSingleton<KodiVfsBridge>();
 builder.Services.AddSingleton<IFFmpegService, FFmpegService>();
 builder.Services.AddSingleton<MediaScanner>();
 builder.Services.AddSingleton<MediaFileIndex>();
-builder.Services.AddSingleton<ServerConfigStore>();
+builder.Services.AddSingleton(sp => new ServerConfigStore(paths, sp.GetRequiredService<ILogger<ServerConfigStore>>()));
 builder.Services.AddSingleton(sp => sp.GetRequiredService<ServerConfigStore>().Current);
 builder.Services.AddSingleton<ScanProgressTracker>();
 builder.Services.AddSingleton<StandaloneAnalyzer>();

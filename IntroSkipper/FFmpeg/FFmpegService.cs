@@ -175,10 +175,23 @@ internal sealed partial class FFmpegService : IFFmpegService
                 return CustomFFmpegPath;
             }
 
-            var appDirFfmpeg = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg");
+            var exeName = OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg";
+            var appDirFfmpeg = Path.Combine(AppContext.BaseDirectory, exeName);
             if (File.Exists(appDirFfmpeg))
             {
                 return appDirFfmpeg;
+            }
+
+            var binSubDirFfmpeg = Path.Combine(AppContext.BaseDirectory, "bin", exeName);
+            if (File.Exists(binSubDirFfmpeg))
+            {
+                return binSubDirFfmpeg;
+            }
+
+            const string defaultAddonBinFfmpeg = "/storage/.kodi/addons/service.introskipper/bin/ffmpeg";
+            if (!OperatingSystem.IsWindows() && File.Exists(defaultAddonBinFfmpeg))
+            {
+                return defaultAddonBinFfmpeg;
             }
 
             return "ffmpeg";

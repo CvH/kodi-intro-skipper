@@ -18,18 +18,17 @@ public sealed class ServerStorage
     /// <summary>
     /// Initializes a new instance of the <see cref="ServerStorage"/> class.
     /// </summary>
-    /// <param name="dataDirectory">Directory to save the SQLite database in. Defaults to the binary directory.</param>
+    /// <param name="paths">Server path provider.</param>
     /// <param name="loggerFactory">Logger factory.</param>
-    public ServerStorage(string? dataDirectory, ILoggerFactory loggerFactory)
+    public ServerStorage(ServerPaths paths, ILoggerFactory loggerFactory)
     {
-        DataDirectory = string.IsNullOrWhiteSpace(dataDirectory)
-            ? AppContext.BaseDirectory
-            : Path.GetFullPath(dataDirectory);
+        ArgumentNullException.ThrowIfNull(paths);
+        paths.EnsureDirectoriesCreated();
 
-        Directory.CreateDirectory(DataDirectory);
-
-        SegmentDatabasePath = Path.Combine(DataDirectory, "introskipper.db");
-        CacheDatabasePath = Path.Combine(DataDirectory, "introskipper-cache.db");
+        Paths = paths;
+        DataDirectory = paths.BaseDataDir;
+        SegmentDatabasePath = paths.SegmentDbPath;
+        CacheDatabasePath = paths.CacheDbPath;
 
         _segmentContextFactory = new SegmentContextFactory(SegmentDatabasePath);
         _cacheContextFactory = new CacheContextFactory(CacheDatabasePath);
@@ -37,6 +36,21 @@ public sealed class ServerStorage
         Database = new IntroSkipperDatabase(_segmentContextFactory, loggerFactory.CreateLogger<IntroSkipperDatabase>());
         CacheDatabase = new DetectionCacheDatabase(_cacheContextFactory, loggerFactory.CreateLogger<DetectionCacheDatabase>());
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ServerStorage"/> class with an explicit data directory.
+    /// </summary>
+    /// <param name="dataDirectory">Directory to save the SQLite database in. Defaults to the binary directory.</param>
+    /// <param name="loggerFactory">Logger factory.</param>
+    public ServerStorage(string? dataDirectory, ILoggerFactory loggerFactory)
+        : this(new ServerPaths(dataDirectory), loggerFactory)
+    {
+    }
+
+    /// <summary>
+    /// Gets the server path provider.
+    /// </summary>
+    public ServerPaths Paths { get; }
 
     /// <summary>
     /// Gets the root data directory where databases and caches reside.

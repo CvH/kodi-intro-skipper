@@ -60,6 +60,15 @@ Open **Intro Skipper** from Kodi's Program / Video Add-ons menu:
 
 The standalone daemon handles all media analysis, audio fingerprinting, and segment storage.
 
+### Filesystem & Subfolder Layout
+By default on Kodi / LibreELEC, files are laid out as:
+- **Addon Binaries**: `/storage/.kodi/addons/service.introskipper/bin/` (`IntroSkipper.Server`, `ffmpeg`, `ffprobe`)
+- **Userdata Databases**: `/storage/.kodi/userdata/addon_data/service.introskipper/db/` (`introskipper.db`, `introskipper-cache.db`)
+- **Userdata Logs**: `/storage/.kodi/userdata/addon_data/service.introskipper/logs/` (`server.log`)
+- **Userdata Configuration**: `/storage/.kodi/userdata/addon_data/service.introskipper/config/` (`config.json`)
+
+Paths can be customized at build time via MSBuild properties (`-p:DefaultAddonId=...`, `-p:DefaultDataDir=...`, `-p:DefaultAddonDir=...`). See **[Standalone Documentation](docs/standalone.md)** for details.
+
 ### Running the Server
 ```bash
 ./IntroSkipper.Server --urls "http://0.0.0.0:8037"
@@ -67,7 +76,7 @@ The standalone daemon handles all media analysis, audio fingerprinting, and segm
 
 ### System Requirements
 * **.NET 10 Runtime** (`dotnet-runtime-10.0` or self-contained publish)
-* **FFmpeg with Chromaprint support**: `IntroSkipper.Server` automatically uses an `./ffmpeg` binary located in its own folder, or system `ffmpeg` / `jellyfin-ffmpeg`.
+* **FFmpeg with Chromaprint support**: `IntroSkipper.Server` automatically uses `bin/ffmpeg` located in the add-on folder or system `ffmpeg` / `jellyfin-ffmpeg`.
 
 ### REST API Endpoints
 

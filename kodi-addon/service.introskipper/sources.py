@@ -56,24 +56,38 @@ def get_sources_xml_path():
 
 def get_config_file_path():
     """
-    Path to scan_sources.json inside the addon's profile folder.
+    Path to scan_sources.json inside the addon's profile or config folder.
     """
-    profile_dir = None
+    candidates = []
     if ADDON:
         try:
             profile_dir = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
+            if profile_dir:
+                candidates.append(os.path.join(profile_dir, 'config', 'scan_sources.json'))
+                candidates.append(os.path.join(profile_dir, 'scan_sources.json'))
         except Exception:
             pass
 
-    if not profile_dir:
-        profile_dir = os.path.expanduser('~/.kodi/userdata/addon_data/service.introskipper')
+    base_dirs = [
+        '/storage/.kodi/userdata/addon_data/service.introskipper',
+        os.path.expanduser('~/.kodi/userdata/addon_data/service.introskipper'),
+    ]
+    for b in base_dirs:
+        candidates.append(os.path.join(b, 'config', 'scan_sources.json'))
+        candidates.append(os.path.join(b, 'scan_sources.json'))
 
-    if not os.path.exists(profile_dir):
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+
+    target = candidates[0] if candidates else '/storage/.kodi/userdata/addon_data/service.introskipper/config/scan_sources.json'
+    target_dir = os.path.dirname(target)
+    if not os.path.exists(target_dir):
         try:
-            os.makedirs(profile_dir, exist_ok=True)
+            os.makedirs(target_dir, exist_ok=True)
         except Exception:
             pass
-    return os.path.join(profile_dir, 'scan_sources.json')
+    return target
 
 
 def load_saved_states():
