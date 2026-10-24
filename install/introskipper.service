@@ -1,0 +1,18 @@
+[Unit]
+Description=IntroSkipper Standalone Service
+After=network.target
+
+[Service]
+Type=simple
+User=media
+Group=media
+WorkingDirectory=/opt/introskipper
+ExecStart=/opt/introskipper/IntroSkipper.Server --urls "http://0.0.0.0:8037"
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+Environment=INTROSKIPPER_DATA_DIR=/opt/introskipper/data
+Environment=INTROSKIPPER_FFMPEG_PATH=/usr/lib/jellyfin-ffmpeg/ffmpeg
+
+[Install]
+WantedBy=multi-user.target
