@@ -301,9 +301,21 @@ def manage_sources():
     )
 
 
+def get_server_path_prefixes():
+    try:
+        server_url = get_server_url()
+        req = urllib.request.Request(f"{server_url}/api/kodi/settings", headers={'User-Agent': 'Kodi-IntroSkipper/1.0'})
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode('utf-8'))
+                return data.get('pathPrefixClient', '').strip(), data.get('pathPrefixServer', '').strip()
+    except Exception:
+        pass
+    return '', ''
+
+
 def map_path(path):
-    client_prefix = get_setting('path_prefix_client', '').strip()
-    server_prefix = get_setting('path_prefix_server', '').strip()
+    client_prefix, server_prefix = get_server_path_prefixes()
     if client_prefix and server_prefix and path.startswith(client_prefix):
         return server_prefix + path[len(client_prefix):]
     return path

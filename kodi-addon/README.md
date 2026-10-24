@@ -48,6 +48,6 @@ In Kodi, go to **Settings** → **Add-ons** → **My add-ons** → **Services** 
    - **Intro Action:** `Show Prompt (Skip Button)`, `Automatically Skip`, or `Disabled`.
    - **Credits Action:** `Show Prompt`, `Automatically Skip`, `Play Next Episode`, or `Disabled`.
    - **Prompt Duration:** How many seconds the prompt stays visible.
-3. **Path Mapping (Optional):**
-   - **Client Path Prefix:** e.g., `smb://192.168.1.50/tv/`
-   - **Server Path Prefix:** e.g., `/mnt/storage/tv/`
+
+> **Note:** Path Prefix Mapping (e.g., `smb://192.168.1.50/tv/` → `/mnt/storage/tv/`) is configured centrally via the IntroSkipper Web Interface under **Settings** → **Kodi Integration**.
+

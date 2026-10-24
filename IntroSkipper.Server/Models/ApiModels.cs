@@ -156,5 +156,6 @@ public sealed record KodiSettingsDto(
     string IntroAction,
     string CreditsAction,
     int CreditsPromptDuration,
-    string PathPrefixClient,
-    string PathPrefixServer);
+    string? PathPrefixClient = null,
+    string? PathPrefixServer = null);
+

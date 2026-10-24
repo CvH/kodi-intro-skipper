@@ -59,6 +59,8 @@ def get_server_url():
 
 # Server <-> Kodi Settings synchronization
 _syncing_from_server = False
+_path_prefix_client = ""
+_path_prefix_server = ""
 
 
 def pull_settings_from_server(server_url=None):
@@ -87,6 +89,10 @@ def pull_settings_from_server(server_url=None):
                 new_intro = intro_map.get(intro_act, '0')
                 new_credits = credits_map.get(credits_act, '0')
 
+                global _path_prefix_client, _path_prefix_server
+                _path_prefix_client = client_pfx
+                _path_prefix_server = server_pfx
+
                 _syncing_from_server = True
                 try:
                     if ADDON:
@@ -96,10 +102,6 @@ def pull_settings_from_server(server_url=None):
                             ADDON.setSetting('credits_action', new_credits)
                         if get_setting_int('credits_prompt_duration') != credits_dur:
                             ADDON.setSettingInt('credits_prompt_duration', int(credits_dur))
-                        if get_setting('path_prefix_client') != client_pfx:
-                            ADDON.setSetting('path_prefix_client', client_pfx)
-                        if get_setting('path_prefix_server') != server_pfx:
-                            ADDON.setSetting('path_prefix_server', server_pfx)
                 finally:
                     _syncing_from_server = False
 
@@ -129,9 +131,7 @@ def push_settings_to_server(server_url=None):
     payload = {
         'introAction': intro_map.get(str(intro_val), 'prompt'),
         'creditsAction': credits_map.get(str(credits_val), 'prompt'),
-        'creditsPromptDuration': get_setting_int('credits_prompt_duration', 10),
-        'pathPrefixClient': get_setting('path_prefix_client', ''),
-        'pathPrefixServer': get_setting('path_prefix_server', '')
+        'creditsPromptDuration': get_setting_int('credits_prompt_duration', 10)
     }
 
     try:
@@ -350,12 +350,10 @@ class IntroSkipperPlayer(xbmc.Player):
 
         log(f"Playback started: file='{playing_file}', series='{series}', S{season}E{episode}")
 
-        # Apply path mapping if configured
-        client_prefix = get_setting('path_prefix_client', '')
-        server_prefix = get_setting('path_prefix_server', '')
+        # Apply path mapping if configured from server
         query_path = playing_file
-        if client_prefix and server_prefix and query_path.startswith(client_prefix):
-            query_path = server_prefix + query_path[len(client_prefix):]
+        if _path_prefix_client and _path_prefix_server and query_path.startswith(_path_prefix_client):
+            query_path = _path_prefix_server + query_path[len(_path_prefix_client):]
             log(f"Mapped client path to server path: '{query_path}'")
 
         # Query standalone IntroSkipper server

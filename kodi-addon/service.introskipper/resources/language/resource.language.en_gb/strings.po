@@ -62,26 +62,6 @@ msgctxt "#30022"
 msgid "Credits Prompt Duration (seconds)"
 msgstr ""
 
-msgctxt "#30030"
-msgid "Path Mapping"
-msgstr ""
-
-msgctxt "#30031"
-msgid "Client Path Prefix"
-msgstr ""
-
-msgctxt "#30032"
-msgid "Path prefix as seen by Kodi (e.g. smb://192.168.1.50/tv/)"
-msgstr ""
-
-msgctxt "#30033"
-msgid "Server Path Prefix"
-msgstr ""
-
-msgctxt "#30034"
-msgid "Path prefix as seen by the server (e.g. /mnt/media/tv/)"
-msgstr ""
-
 msgctxt "#30040"
 msgid "Scan Management"
 msgstr ""

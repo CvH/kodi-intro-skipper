@@ -146,6 +146,7 @@ app.MapGet("/api/segments", async (
     [FromQuery] int? episode,
     MediaFileIndex index,
     ServerStorage storage,
+    ServerConfigStore configStore,
     CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(path) && string.IsNullOrWhiteSpace(series))
@@ -153,7 +154,17 @@ app.MapGet("/api/segments", async (
         return Results.BadRequest(new { error = "Either 'path' or 'series' must be provided." });
     }
 
-    if (!index.TryResolve(path, series, season, episode, out var itemId))
+    var resolvedPath = path;
+    var cfg = configStore.Current;
+    if (!string.IsNullOrEmpty(resolvedPath) &&
+        !string.IsNullOrEmpty(cfg.KodiPathPrefixClient) &&
+        !string.IsNullOrEmpty(cfg.KodiPathPrefixServer) &&
+        resolvedPath.StartsWith(cfg.KodiPathPrefixClient, StringComparison.OrdinalIgnoreCase))
+    {
+        resolvedPath = cfg.KodiPathPrefixServer + resolvedPath[cfg.KodiPathPrefixClient.Length..];
+    }
+
+    if (!index.TryResolve(resolvedPath, series, season, episode, out var itemId))
     {
         return Results.NotFound(new { error = "Media item not found in index." });
     }
@@ -172,15 +183,30 @@ app.MapGet("/api/segments", async (
 // Start scan endpoint
 var handleStartScan = (
     [FromBody] ScanRequest request,
-    AnalysisQueue queue) =>
+    AnalysisQueue queue,
+    ServerConfigStore configStore) =>
 {
-    if (string.IsNullOrWhiteSpace(request?.Path) || (!Directory.Exists(request.Path) && !request.Path.Contains("://")))
+    if (request is null || string.IsNullOrWhiteSpace(request.Path))
     {
         return Results.BadRequest(new { error = "Valid directory or network share path is required." });
     }
 
-    queue.Enqueue(request.Path, request.ExportEdl);
-    return Results.Accepted("/api/scan/status", new { message = "Scan enqueued", path = request.Path });
+    var scanPath = request.Path;
+    var cfg = configStore.Current;
+    if (!string.IsNullOrEmpty(cfg.KodiPathPrefixClient) &&
+        !string.IsNullOrEmpty(cfg.KodiPathPrefixServer) &&
+        scanPath.StartsWith(cfg.KodiPathPrefixClient, StringComparison.OrdinalIgnoreCase))
+    {
+        scanPath = cfg.KodiPathPrefixServer + scanPath[cfg.KodiPathPrefixClient.Length..];
+    }
+
+    if (!Directory.Exists(scanPath) && !scanPath.Contains("://"))
+    {
+        return Results.BadRequest(new { error = "Valid directory or network share path is required." });
+    }
+
+    queue.Enqueue(scanPath, request.ExportEdl);
+    return Results.Accepted("/api/scan/status", new { message = "Scan enqueued", path = scanPath });
 };
 
 app.MapPost("/api/scan", handleStartScan);
@@ -194,11 +220,21 @@ app.MapPost("/api/scan/item", async (
     StandaloneAnalyzer analyzer,
     AnalysisQueue queue,
     ServerStorage storage,
+    ServerConfigStore configStore,
     CancellationToken ct) =>
 {
-    if (string.IsNullOrWhiteSpace(request?.Path))
+    if (request is null || string.IsNullOrWhiteSpace(request.Path))
     {
         return Results.BadRequest(new { error = "Path is required." });
+    }
+
+    var itemPath = request.Path;
+    var cfg = configStore.Current;
+    if (!string.IsNullOrEmpty(cfg.KodiPathPrefixClient) &&
+        !string.IsNullOrEmpty(cfg.KodiPathPrefixServer) &&
+        itemPath.StartsWith(cfg.KodiPathPrefixClient, StringComparison.OrdinalIgnoreCase))
+    {
+        itemPath = cfg.KodiPathPrefixServer + itemPath[cfg.KodiPathPrefixClient.Length..];
     }
 
     var series = request.Series;
@@ -208,7 +244,7 @@ app.MapPost("/api/scan/item", async (
 
     if (string.IsNullOrWhiteSpace(series))
     {
-        if (scanner.TryParseEpisode(request.Path, out var parsed) && parsed is not null)
+        if (scanner.TryParseEpisode(itemPath, out var parsed) && parsed is not null)
         {
             series = parsed.SeriesName;
             season = parsed.SeasonNumber;
@@ -217,20 +253,20 @@ app.MapPost("/api/scan/item", async (
         }
         else
         {
-            series = Path.GetFileNameWithoutExtension(request.Path);
+            series = Path.GetFileNameWithoutExtension(itemPath);
         }
     }
 
-    var episodeInfo = new ParsedEpisodeInfo(request.Path, series, season, episode, title);
+    var episodeInfo = new ParsedEpisodeInfo(itemPath, series, season, episode, title);
     fileIndex.Register(episodeInfo);
 
     if (request.Wait)
     {
         // Try to include sibling episodes from the same folder so Chromaprint cross-episode fingerprinting works
-        var dir = Path.GetDirectoryName(request.Path);
-        if (string.IsNullOrEmpty(dir) && request.Path.Contains('/'))
+        var dir = Path.GetDirectoryName(itemPath);
+        if (string.IsNullOrEmpty(dir) && itemPath.Contains('/'))
         {
-            dir = request.Path[..request.Path.LastIndexOf('/')];
+            dir = itemPath[..itemPath.LastIndexOf('/')];
         }
 
         IReadOnlyList<ParsedEpisodeInfo> batch = [episodeInfo];
@@ -257,7 +293,7 @@ app.MapPost("/api/scan/item", async (
 
         await analyzer.AnalyzeSeasonAsync(batch, request.ExportEdl, ct).ConfigureAwait(false);
 
-        var episodeId = ItemIdGenerator.FromPath(request.Path);
+        var episodeId = ItemIdGenerator.FromPath(itemPath);
         var stored = await storage.Database.GetSegmentsAsync(episodeId, cancellationToken: ct).ConfigureAwait(false);
         var segResponses = stored.Select(s => new SegmentResponse(
             s.Id,
@@ -267,7 +303,7 @@ app.MapPost("/api/scan/item", async (
             s.Source.ToString())).ToList();
 
         return Results.Ok(new ScanItemResponse(
-            request.Path,
+            itemPath,
             series,
             season,
             episode,
@@ -276,9 +312,9 @@ app.MapPost("/api/scan/item", async (
     }
     else
     {
-        queue.Enqueue(request.Path, request.ExportEdl);
+        queue.Enqueue(itemPath, request.ExportEdl);
         return Results.Accepted("/api/scan/status", new ScanItemResponse(
-            request.Path,
+            itemPath,
             series,
             season,
             episode,
@@ -440,8 +476,15 @@ app.MapPost("/api/kodi/settings", (
         cfg.KodiCreditsPromptDuration = settings.CreditsPromptDuration;
     }
 
-    cfg.KodiPathPrefixClient = settings.PathPrefixClient ?? string.Empty;
-    cfg.KodiPathPrefixServer = settings.PathPrefixServer ?? string.Empty;
+    if (settings.PathPrefixClient is not null)
+    {
+        cfg.KodiPathPrefixClient = settings.PathPrefixClient;
+    }
+
+    if (settings.PathPrefixServer is not null)
+    {
+        cfg.KodiPathPrefixServer = settings.PathPrefixServer;
+    }
 
     configStore.Save();
 
