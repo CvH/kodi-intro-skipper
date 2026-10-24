@@ -34,7 +34,9 @@ The `IntroSkipper.Server` standalone daemon provides a lightweight, high-perform
 | [`/api/segments`](#6-query-segments) | `GET` | Query detected intro and credit boundaries for an episode |
 | [`/api/stats`](#7-library-statistics) | `GET` | Summary statistics of indexed shows, episodes, segments, and time saved |
 | [`/api/logs`](#8-server-logs) | `GET` | Retrieve recent server log lines (JSON or raw plain text) |
-| [`/`](#9-landing-page) | `GET` | Minimal HTML dashboard and endpoint index |
+| [`/api/config`](#9-configuration-management) | `GET` / `POST` | Retrieve or update server detection configuration and exclusions |
+| [`/api/config/reset`](#9-configuration-management) | `POST` | Reset all configuration properties back to default values |
+| [`/` or `/settings`](#10-web-dashboard--settings-gui) | `GET` | Standalone interactive web dashboard & settings user interface |
 
 ---
 
@@ -367,17 +369,57 @@ curl -s "http://127.0.0.1:8037/api/logs?lines=20&raw=true"
 
 ---
 
-### 9. Landing Page
+### 9. Configuration Management
 
-Interactive HTML landing page providing direct links to API endpoints and active database information.
+Read, update, or reset server configuration. Changes are persisted automatically to `config.json` in the server data directory and take effect immediately across all background analysis queues.
+
+#### 9.1 Get Current Configuration
+- **Method:** `GET`
+- **Path:** `/api/config`
+
+##### Curl Example
+```bash
+curl -s http://127.0.0.1:8037/api/config
+```
+
+#### 9.2 Update Configuration
+- **Method:** `POST`
+- **Path:** `/api/config`
+- **Headers:** `Content-Type: application/json`
+
+Supports both full configuration objects and partial updates (only specified fields are modified).
+
+##### Curl Example: Update Analysis Percentage & Add Excluded Series
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"analysisPercent": 30, "seriesExclusions": ["Sample Show"]}' \
+  http://127.0.0.1:8037/api/config
+```
+
+#### 9.3 Reset Configuration to Defaults
+- **Method:** `POST`
+- **Path:** `/api/config/reset`
+
+##### Curl Example
+```bash
+curl -s -X POST http://127.0.0.1:8037/api/config/reset
+```
+
+---
+
+### 10. Web Dashboard & Settings GUI
+
+Serves a full, responsive standalone Single Page Application with interactive controls for all detection rules, live KPI statistics, active scan progress monitoring, quick scan triggering, and exclusion management.
 
 - **Method:** `GET`
-- **Path:** `/`
+- **Path:** `/` or `/settings`
 
 #### Curl Example
 ```bash
 curl -s http://127.0.0.1:8037/
 ```
+
+Open `http://127.0.0.1:8037/` in any browser to access the graphical settings dashboard.
 
 ---
 

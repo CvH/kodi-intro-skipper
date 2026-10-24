@@ -6,10 +6,12 @@ using IntroSkipper.Data;
 using IntroSkipper.FFmpeg;
 using IntroSkipper.Server;
 using IntroSkipper.Server.Analysis;
+using IntroSkipper.Server.Configuration;
 using IntroSkipper.Server.Kodi;
 using IntroSkipper.Server.Logging;
 using IntroSkipper.Server.Models;
 using IntroSkipper.Server.Scanning;
+using IntroSkipper.Server.Web;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -69,7 +71,8 @@ builder.Services.AddSingleton<KodiVfsBridge>();
 builder.Services.AddSingleton<IFFmpegService, FFmpegService>();
 builder.Services.AddSingleton<MediaScanner>();
 builder.Services.AddSingleton<MediaFileIndex>();
-builder.Services.AddSingleton(new PluginConfiguration());
+builder.Services.AddSingleton<ServerConfigStore>();
+builder.Services.AddSingleton(sp => sp.GetRequiredService<ServerConfigStore>().Current);
 builder.Services.AddSingleton<ScanProgressTracker>();
 builder.Services.AddSingleton<StandaloneAnalyzer>();
 builder.Services.AddSingleton<AnalysisQueue>();
@@ -344,23 +347,21 @@ app.MapGet("/api/stats", async (
         formattedTime));
 });
 
-// Minimal landing page
-app.MapGet("/", (ServerStorage storage) => Results.Content(
-    $"""
-    <!DOCTYPE html>
-    <html>
-    <head><title>IntroSkipper Standalone Server</title></head>
-    <body style="font-family: sans-serif; max-width: 800px; margin: 40px auto; line-height: 1.6;">
-        <h1>IntroSkipper Standalone Server</h1>
-        <p>Service is active and listening for Kodi addon requests.</p>
-        <ul>
-            <li><strong>Database:</strong> {storage.SegmentDatabasePath}</li>
-            <li><strong>Status:</strong> <a href="/api/status">/api/status</a></li>
-            <li><strong>Scan Progress:</strong> <a href="/api/scan/status">/api/scan/status</a></li>
-            <li><strong>Segments API:</strong> <code>/api/segments?path=...&series=...&season=1&episode=1</code></li>
-        </ul>
-    </body>
-    </html>
-    """, "text/html"));
+// Configuration management endpoints
+app.MapGet("/api/config", (ServerConfigStore configStore) => Results.Ok(configStore.Current));
+
+app.MapPost("/api/config", (
+    [FromBody] System.Text.Json.JsonElement payload,
+    ServerConfigStore configStore) =>
+{
+    configStore.UpdateFromJson(payload);
+    return Results.Ok(configStore.Current);
+});
+
+app.MapPost("/api/config/reset", (ServerConfigStore configStore) => Results.Ok(configStore.Reset()));
+
+// Interactive web dashboard & settings
+app.MapGet("/", () => Results.Content(DashboardPage.GetHtml(), "text/html"));
+app.MapGet("/settings", () => Results.Content(DashboardPage.GetHtml(), "text/html"));
 
 await app.RunAsync().ConfigureAwait(false);
