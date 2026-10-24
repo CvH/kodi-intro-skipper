@@ -11,6 +11,12 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebuggerSupport>false</DebuggerSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+  </PropertyGroup>
+
   <PropertyGroup>
     <!-- Default Kodi Addon identifier and filesystem layout -->
     <DefaultAddonId Condition="'$(DefaultAddonId)' == ''">service.introskipper</DefaultAddonId>
