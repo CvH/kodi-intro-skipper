@@ -36,7 +36,10 @@ The `IntroSkipper.Server` standalone daemon provides a lightweight, high-perform
 | [`/api/logs`](#8-server-logs) | `GET` | Retrieve recent server log lines (JSON or raw plain text) |
 | [`/api/config`](#9-configuration-management) | `GET` / `POST` | Retrieve or update server detection configuration and exclusions |
 | [`/api/config/reset`](#9-configuration-management) | `POST` | Reset all configuration properties back to default values |
-| [`/` or `/settings`](#10-web-dashboard--settings-gui) | `GET` | Standalone interactive web dashboard & settings user interface |
+| [`/api/sources`](#10-media-scan-sources-management) | `GET` / `POST` / `DELETE` | View, add, update, or remove configured media scan sources |
+| [`/api/sources/sync`](#10-media-scan-sources-management) | `POST` | Bidirectional bulk sync of media sources between Kodi and server |
+| [`/api/kodi/settings`](#11-kodi--playback-settings-synchronization) | `GET` / `POST` | Query or update Kodi playback actions, prompt duration, and path mappings |
+| [`/` or `/settings`](#12-web-dashboard--settings-gui) | `GET` | Standalone interactive web dashboard & settings user interface |
 
 ---
 
@@ -407,9 +410,122 @@ curl -s -X POST http://127.0.0.1:8037/api/config/reset
 
 ---
 
-### 10. Web Dashboard & Settings GUI
+### 10. Media Scan Sources Management
 
-Serves a full, responsive standalone Single Page Application with interactive controls for all detection rules, live KPI statistics, active scan progress monitoring, quick scan triggering, and exclusion management.
+Manages configured media paths (local directories and network shares) scanned for intro and credit detection. Scan sources are persisted in `config.json` and synchronized bidirectionally between Kodi and the web interface.
+
+#### 10.1 List Configured Sources
+- **Method:** `GET`
+- **Path:** `/api/sources`
+
+##### Curl Example
+```bash
+curl -s http://127.0.0.1:8037/api/sources
+```
+
+##### Example Response (`200 OK`)
+```json
+[
+  {
+    "name": "TV Shows",
+    "path": "/storage/tvshows",
+    "enabled": true
+  },
+  {
+    "name": "Anime Share",
+    "path": "smb://192.168.0.99/Media/Anime",
+    "enabled": false
+  }
+]
+```
+
+#### 10.2 Add or Update a Source
+- **Method:** `POST`
+- **Path:** `/api/sources`
+- **Headers:** `Content-Type: application/json`
+
+##### Curl Example: Add or Enable a Media Source
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"name": "TV Shows", "path": "/storage/tvshows", "enabled": true}' \
+  http://127.0.0.1:8037/api/sources
+```
+
+#### 10.3 Synchronize Sources in Bulk (Bidirectional Sync)
+- **Method:** `POST`
+- **Path:** `/api/sources/sync`
+- **Headers:** `Content-Type: application/json`
+
+Merges incoming sources (e.g. from Kodi `sources.xml`). Any incoming path not already on the server is added; existing paths maintain their server-configured enabled state. Returns the merged list.
+
+##### Curl Example
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"sources": [{"name": "TV Shows", "path": "/storage/tvshows", "enabled": true}]}' \
+  http://127.0.0.1:8037/api/sources/sync
+```
+
+#### 10.4 Remove a Source
+- **Method:** `DELETE`
+- **Path:** `/api/sources?path=<encoded_path>`
+
+##### Curl Example
+```bash
+curl -s -X DELETE "http://127.0.0.1:8037/api/sources?path=%2Fstorage%2Ftvshows"
+```
+
+---
+
+### 11. Kodi & Playback Settings Synchronization
+
+Provides bidirectional synchronization between the Kodi add-on and the web interface for player behavior and path prefix translation.
+
+- **Intro Actions:** `prompt` (Show on-screen skip button), `autoskip` (Skip automatically), `disabled` (Do nothing).
+- **Credits Actions:** `prompt` (Show on-screen skip/next button), `autoskip` (Skip automatically), `nextEpisode` (Immediately jump to next episode), `disabled` (Do nothing).
+
+#### 11.1 Query Kodi Playback Settings
+- **Method:** `GET`
+- **Path:** `/api/kodi/settings`
+
+##### Curl Example
+```bash
+curl -s http://127.0.0.1:8037/api/kodi/settings
+```
+
+##### Example Response (`200 OK`)
+```json
+{
+  "introAction": "prompt",
+  "creditsAction": "prompt",
+  "creditsPromptDuration": 10,
+  "pathPrefixClient": "smb://192.168.0.100/Media/",
+  "pathPrefixServer": "/mnt/media/"
+}
+```
+
+#### 11.2 Update Kodi Playback Settings
+- **Method:** `POST`
+- **Path:** `/api/kodi/settings`
+- **Headers:** `Content-Type: application/json`
+
+##### Curl Example
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{
+    "introAction": "autoskip",
+    "creditsAction": "prompt",
+    "creditsPromptDuration": 12,
+    "pathPrefixClient": "smb://192.168.0.100/Media/",
+    "pathPrefixServer": "/mnt/media/"
+  }' \
+  http://127.0.0.1:8037/api/kodi/settings
+```
+
+---
+
+### 12. Web Dashboard & Settings GUI
+
+Serves a full, responsive standalone Single Page Application with interactive controls for all detection rules, live KPI statistics, active scan progress monitoring, quick scan triggering, exclusion management, configured media scan sources, and Kodi playback behavior.
 
 - **Method:** `GET`
 - **Path:** `/` or `/settings`

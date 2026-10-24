@@ -147,9 +147,115 @@ def set_source_enabled(path, enabled):
     save_saved_states(states)
 
 
-def get_enabled_paths():
+def sync_sources_with_server(server_url, timeout=3):
     """
-    Returns only the paths that are currently enabled for scanning.
+    Synchronizes local sources (from sources.xml) with the server's scan sources list.
+    Sends local sources via POST /api/sources/sync.
+    Receives the merged server sources, updates local saved_states with server states,
+    and returns the server's list of sources.
     """
-    sources = get_video_sources()
-    return [s['path'] for s in sources if s['enabled']]
+    if not server_url:
+        return get_video_sources()
+
+    server_url = server_url.rstrip('/')
+    local_sources = get_video_sources()
+    payload = {
+        'sources': [
+            {'name': s['name'], 'path': s['path'], 'enabled': s['enabled']}
+            for s in local_sources
+        ]
+    }
+
+    try:
+        import urllib.request
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(
+            f"{server_url}/api/sources/sync",
+            data=data,
+            headers={'Content-Type': 'application/json', 'User-Agent': 'Kodi-IntroSkipper/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if resp.status == 200:
+                server_sources = json.loads(resp.read().decode('utf-8'))
+                states = {}
+                for s in server_sources:
+                    p = s.get('path')
+                    if p:
+                        states[p] = bool(s.get('enabled', False))
+                save_saved_states(states)
+                log(f"Synchronized {len(server_sources)} sources with server.")
+                return server_sources
+    except Exception as ex:
+        log(f"Failed to sync sources with server: {ex}", xbmc.LOGWARNING if xbmc else None)
+
+    return local_sources
+
+
+def fetch_server_sources(server_url, timeout=3):
+    """
+    Fetches the configured media sources from the server.
+    """
+    if not server_url:
+        return get_video_sources()
+
+    server_url = server_url.rstrip('/')
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            f"{server_url}/api/sources",
+            headers={'User-Agent': 'Kodi-IntroSkipper/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if resp.status == 200:
+                return json.loads(resp.read().decode('utf-8'))
+    except Exception as ex:
+        log(f"Failed to fetch sources from server: {ex}", xbmc.LOGDEBUG if xbmc else None)
+
+    return get_video_sources()
+
+
+def push_sources_to_server(server_url, sources_list, timeout=3):
+    """
+    Pushes an explicit list of sources with their enabled statuses to the server.
+    """
+    if not server_url:
+        return False
+
+    server_url = server_url.rstrip('/')
+    payload = {
+        'sources': [
+            {'name': s.get('name', ''), 'path': s.get('path', ''), 'enabled': bool(s.get('enabled', False))}
+            for s in sources_list
+        ]
+    }
+
+    try:
+        import urllib.request
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(
+            f"{server_url}/api/sources/sync",
+            data=data,
+            headers={'Content-Type': 'application/json', 'User-Agent': 'Kodi-IntroSkipper/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status == 200
+    except Exception as ex:
+        log(f"Failed to push sources to server: {ex}", xbmc.LOGWARNING if xbmc else None)
+        return False
+
+
+def get_enabled_paths(server_url=None):
+    """
+    Returns all media source paths that are currently enabled for scanning.
+    If server_url is supplied and reachable, queries server sources directly.
+    """
+    if server_url:
+        try:
+            sources_list = fetch_server_sources(server_url)
+            return [s['path'] for s in sources_list if s.get('enabled', False)]
+        except Exception:
+            pass
+
+    sources_list = get_video_sources()
+    return [s['path'] for s in sources_list if s.get('enabled', False)]
+

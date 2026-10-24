@@ -124,5 +124,35 @@ public sealed record ServerStatsResponse(
     double TotalSkippedSeconds,
     string FormattedSkippedTime);
 
+/// <summary>
+/// Request to add, update, or remove a scan source.
+/// </summary>
+/// <param name="Name">Friendly name of the source.</param>
+/// <param name="Path">Filesystem or network share path.</param>
+/// <param name="Enabled">Whether the source is enabled.</param>
+public sealed record ScanSourceRequest(
+    string? Name = null,
+    string Path = "",
+    bool? Enabled = null);
 
+/// <summary>
+/// Request to synchronize multiple scan sources.
+/// </summary>
+/// <param name="Sources">Collection of scan sources to synchronize.</param>
+public sealed record SyncSourcesRequest(
+    IReadOnlyList<ScanSourceRequest> Sources);
 
+/// <summary>
+/// Kodi playback and client integration settings.
+/// </summary>
+/// <param name="IntroAction">Action when intro is encountered (prompt, autoskip, disabled).</param>
+/// <param name="CreditsAction">Action when credits are encountered (prompt, autoskip, nextEpisode, disabled).</param>
+/// <param name="CreditsPromptDuration">Duration in seconds to display credits prompt.</param>
+/// <param name="PathPrefixClient">Client-side path prefix mapping.</param>
+/// <param name="PathPrefixServer">Server-side path prefix mapping.</param>
+public sealed record KodiSettingsDto(
+    string IntroAction,
+    string CreditsAction,
+    int CreditsPromptDuration,
+    string PathPrefixClient,
+    string PathPrefixServer);

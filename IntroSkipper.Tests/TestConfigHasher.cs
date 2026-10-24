@@ -49,6 +49,12 @@ public sealed class TestConfigHasher
         nameof(PluginConfiguration.AutoSkipCredits),
         nameof(PluginConfiguration.SkipButtonVisibleSeconds),
         nameof(PluginConfiguration.EnableMainMenu),
+        nameof(PluginConfiguration.ScanSources),
+        nameof(PluginConfiguration.KodiIntroAction),
+        nameof(PluginConfiguration.KodiCreditsAction),
+        nameof(PluginConfiguration.KodiCreditsPromptDuration),
+        nameof(PluginConfiguration.KodiPathPrefixClient),
+        nameof(PluginConfiguration.KodiPathPrefixServer),
     ];
 
     public static TheoryData<string, string, string, bool> Cases()

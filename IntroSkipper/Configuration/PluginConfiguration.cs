@@ -107,6 +107,11 @@ public class PluginConfiguration : BasePluginConfiguration
     public Collection<string?> PathExclusions { get; init; } = [];
 
     /// <summary>
+    /// Gets the list of configured media scan source paths.
+    /// </summary>
+    public Collection<ScanSource> ScanSources { get; init; } = [];
+
+    /// <summary>
     /// Gets or sets a value indicating whether to automatically scan newly added items.
     /// </summary>
     public bool AutoDetectIntros { get; set; } = true;
@@ -566,6 +571,31 @@ public class PluginConfiguration : BasePluginConfiguration
     /// intro start is snapped to the beginning of the episode.
     /// </summary>
     public bool IncludeIntroStartOffsetWhenSnapping { get; set; }
+
+    /// <summary>
+    /// Gets or sets the action taken when an intro is detected during playback: "prompt", "autoskip", or "disabled".
+    /// </summary>
+    public string KodiIntroAction { get; set; } = "prompt";
+
+    /// <summary>
+    /// Gets or sets the action taken when credits are detected during playback: "prompt", "autoskip", "nextEpisode", or "disabled".
+    /// </summary>
+    public string KodiCreditsAction { get; set; } = "prompt";
+
+    /// <summary>
+    /// Gets or sets the duration in seconds to display the credits skip prompt.
+    /// </summary>
+    public int KodiCreditsPromptDuration { get; set; } = 8;
+
+    /// <summary>
+    /// Gets or sets the client path prefix for path translation.
+    /// </summary>
+    public string KodiPathPrefixClient { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the server path prefix for path translation.
+    /// </summary>
+    public string KodiPathPrefixServer { get; set; } = string.Empty;
 
     // ===== Internal algorithm settings =====
 

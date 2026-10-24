@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using IntroSkipper.Configuration;
+using IntroSkipper.Data;
 using Microsoft.Extensions.Logging;
 
 namespace IntroSkipper.Server.Configuration;
@@ -159,7 +160,127 @@ public sealed class ServerConfigStore
                 }
             }
 
+            if (TryGetArrayProperty(root, "scanSources", out var sourcesArr))
+            {
+                Current.ScanSources.Clear();
+                foreach (var item in sourcesArr.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.Object)
+                    {
+                        var name = item.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
+                        var path = item.TryGetProperty("path", out var p) ? p.GetString() ?? string.Empty : string.Empty;
+                        var enabled = item.TryGetProperty("enabled", out var e) && e.GetBoolean();
+                        if (!string.IsNullOrWhiteSpace(path))
+                        {
+                            Current.ScanSources.Add(new ScanSource(name, path, enabled));
+                        }
+                    }
+                }
+            }
+
             Save();
+        }
+    }
+
+    /// <summary>
+    /// Gets all configured media scan source paths.
+    /// </summary>
+    /// <returns>A read-only list of configured sources.</returns>
+    public IReadOnlyList<ScanSource> GetScanSources()
+    {
+        lock (_syncLock)
+        {
+            return Current.ScanSources.ToList();
+        }
+    }
+
+    /// <summary>
+    /// Adds or updates a media scan source path.
+    /// </summary>
+    /// <param name="name">Source friendly name.</param>
+    /// <param name="path">Source filesystem or share path.</param>
+    /// <param name="enabled">Whether the source is enabled.</param>
+    public void SetScanSource(string name, string path, bool enabled)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        lock (_syncLock)
+        {
+            var existing = Current.ScanSources.FirstOrDefault(s => string.Equals(s.Path, path, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                Current.ScanSources.Remove(existing);
+            }
+
+            var friendlyName = string.IsNullOrWhiteSpace(name)
+                ? (existing?.Name ?? Path.GetFileName(path.TrimEnd('/', '\\')))
+                : name;
+
+            Current.ScanSources.Add(new ScanSource(friendlyName, path, enabled));
+            Save();
+        }
+    }
+
+    /// <summary>
+    /// Removes a media scan source path by its path string.
+    /// </summary>
+    /// <param name="path">Path to remove.</param>
+    /// <returns>True if found and removed; otherwise false.</returns>
+    public bool RemoveScanSource(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        lock (_syncLock)
+        {
+            var existing = Current.ScanSources.FirstOrDefault(s => string.Equals(s.Path, path, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                Current.ScanSources.Remove(existing);
+                Save();
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Synchronizes a list of sources (e.g. from Kodi sources.xml) with the server's sources.
+    /// Any incoming path not present on server is added. Existing paths retain their server-configured enabled state.
+    /// </summary>
+    /// <param name="incoming">Incoming source paths from Kodi.</param>
+    /// <returns>The merged and synchronized list of scan sources.</returns>
+    public IReadOnlyList<ScanSource> SyncScanSources(IEnumerable<ScanSource> incoming)
+    {
+        ArgumentNullException.ThrowIfNull(incoming);
+
+        lock (_syncLock)
+        {
+            var changed = false;
+            foreach (var item in incoming)
+            {
+                if (string.IsNullOrWhiteSpace(item.Path))
+                {
+                    continue;
+                }
+
+                var existing = Current.ScanSources.FirstOrDefault(s => string.Equals(s.Path, item.Path, StringComparison.OrdinalIgnoreCase));
+                if (existing is null)
+                {
+                    Current.ScanSources.Add(item);
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                Save();
+            }
+
+            return Current.ScanSources.ToList();
         }
     }
 
@@ -220,6 +341,12 @@ public sealed class ServerConfigStore
         foreach (var item in source.PathExclusions)
         {
             target.PathExclusions.Add(item);
+        }
+
+        target.ScanSources.Clear();
+        foreach (var item in source.ScanSources)
+        {
+            target.ScanSources.Add(new ScanSource(item.Name, item.Path, item.Enabled));
         }
     }
 

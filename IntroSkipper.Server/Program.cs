@@ -360,6 +360,98 @@ app.MapPost("/api/config", (
 
 app.MapPost("/api/config/reset", (ServerConfigStore configStore) => Results.Ok(configStore.Reset()));
 
+// Media scan source management endpoints
+app.MapGet("/api/sources", (ServerConfigStore configStore) =>
+    Results.Ok(configStore.GetScanSources()));
+
+app.MapPost("/api/sources", (
+    [FromBody] ScanSourceRequest request,
+    ServerConfigStore configStore) =>
+{
+    if (string.IsNullOrWhiteSpace(request?.Path))
+    {
+        return Results.BadRequest(new { error = "Path is required." });
+    }
+
+    configStore.SetScanSource(request.Name ?? string.Empty, request.Path, request.Enabled ?? true);
+    return Results.Ok(configStore.GetScanSources());
+});
+
+app.MapPost("/api/sources/sync", (
+    [FromBody] SyncSourcesRequest request,
+    ServerConfigStore configStore) =>
+{
+    var incoming = (request?.Sources ?? [])
+        .Where(s => !string.IsNullOrWhiteSpace(s.Path))
+        .Select(s => new ScanSource(s.Name ?? string.Empty, s.Path, s.Enabled ?? true));
+
+    var synced = configStore.SyncScanSources(incoming);
+    return Results.Ok(synced);
+});
+
+app.MapDelete("/api/sources", (
+    [FromQuery] string? path,
+    ServerConfigStore configStore) =>
+{
+    if (string.IsNullOrWhiteSpace(path))
+    {
+        return Results.BadRequest(new { error = "Path query parameter is required." });
+    }
+
+    var removed = configStore.RemoveScanSource(path);
+    return Results.Ok(new { path, removed });
+});
+
+// Kodi playback & client settings endpoints
+app.MapGet("/api/kodi/settings", (ServerConfigStore configStore) =>
+{
+    var cfg = configStore.Current;
+    return Results.Ok(new KodiSettingsDto(
+        cfg.KodiIntroAction,
+        cfg.KodiCreditsAction,
+        cfg.KodiCreditsPromptDuration,
+        cfg.KodiPathPrefixClient,
+        cfg.KodiPathPrefixServer));
+});
+
+app.MapPost("/api/kodi/settings", (
+    [FromBody] KodiSettingsDto settings,
+    ServerConfigStore configStore) =>
+{
+    if (settings is null)
+    {
+        return Results.BadRequest(new { error = "Settings payload is required." });
+    }
+
+    var cfg = configStore.Current;
+    if (!string.IsNullOrWhiteSpace(settings.IntroAction))
+    {
+        cfg.KodiIntroAction = settings.IntroAction;
+    }
+
+    if (!string.IsNullOrWhiteSpace(settings.CreditsAction))
+    {
+        cfg.KodiCreditsAction = settings.CreditsAction;
+    }
+
+    if (settings.CreditsPromptDuration > 0)
+    {
+        cfg.KodiCreditsPromptDuration = settings.CreditsPromptDuration;
+    }
+
+    cfg.KodiPathPrefixClient = settings.PathPrefixClient ?? string.Empty;
+    cfg.KodiPathPrefixServer = settings.PathPrefixServer ?? string.Empty;
+
+    configStore.Save();
+
+    return Results.Ok(new KodiSettingsDto(
+        cfg.KodiIntroAction,
+        cfg.KodiCreditsAction,
+        cfg.KodiCreditsPromptDuration,
+        cfg.KodiPathPrefixClient,
+        cfg.KodiPathPrefixServer));
+});
+
 // Interactive web dashboard & settings
 app.MapGet("/", () => Results.Content(DashboardPage.GetHtml(), "text/html"));
 app.MapGet("/settings", () => Results.Content(DashboardPage.GetHtml(), "text/html"));

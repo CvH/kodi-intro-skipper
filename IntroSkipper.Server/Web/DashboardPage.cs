@@ -491,6 +491,7 @@ public static class DashboardPage
   <nav class="nav-tabs">
     <div class="tabs-container">
       <button class="tab-btn active" data-tab="tab-overview">📊 Overview</button>
+      <button class="tab-btn" data-tab="tab-kodi">📺 Kodi & Playback</button>
       <button class="tab-btn" data-tab="tab-general">⚙️ General</button>
       <button class="tab-btn" data-tab="tab-audio">🎵 Audio & Fingerprint</button>
       <button class="tab-btn" data-tab="tab-detection">⏱️ Detection Rules</button>
@@ -541,6 +542,30 @@ public static class DashboardPage
         <div id="scanCountsLabel" style="font-size: 0.78rem; color: var(--text-dim);"></div>
       </div>
 
+      <!-- Configured Media Sources -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">📂 Configured Media Sources</div>
+            <div class="card-desc">Folders and network shares scanned for intro &amp; credit detection</div>
+          </div>
+          <button id="scanAllSourcesBtn" class="btn btn-primary" style="font-size: 0.85rem; padding: 6px 14px;">▶ Scan All Enabled</button>
+        </div>
+        
+        <div id="sourcesList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+          <div style="color: var(--text-muted); font-size: 0.85rem;">Loading sources...</div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px;">
+          <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: var(--text-muted);">Add New Source Path</div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <input type="text" id="newSourceName" placeholder="Name (e.g. TV Shows)" style="max-width: 180px;" />
+            <input type="text" id="newSourcePath" placeholder="Path (e.g. /storage/tvshows or smb://server/TV)" style="max-width: none; flex: 1; min-width: 200px;" />
+            <button id="addSourceBtn" class="btn btn-secondary">+ Add Source</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Trigger scan card -->
       <div class="card">
         <div class="card-header">
@@ -581,6 +606,79 @@ public static class DashboardPage
             <span class="setting-label">Kodi VFS Bridge</span>
             <span id="kodiVfsLabel" class="setting-desc">Loading...</span>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: KODI & PLAYBACK -->
+    <div id="tab-kodi" class="tab-panel">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Kodi Add-on Playback Behavior</div>
+            <div class="card-desc">Configure how the Kodi player handles detected intro and credit markers</div>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label for="cfg_kodiIntroAction" class="setting-label">Introduction Action</label>
+            <span class="setting-desc">Action to perform when playback enters a detected intro sequence.</span>
+          </div>
+          <select id="cfg_kodiIntroAction">
+            <option value="prompt">Show On-Screen Skip Button</option>
+            <option value="autoskip">Automatically Skip</option>
+            <option value="disabled">Disabled (Do nothing)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label for="cfg_kodiCreditsAction" class="setting-label">Credits Action</label>
+            <span class="setting-desc">Action to perform when playback reaches ending credits.</span>
+          </div>
+          <select id="cfg_kodiCreditsAction">
+            <option value="prompt">Show On-Screen Skip / Next Button</option>
+            <option value="autoskip">Automatically Skip Credits</option>
+            <option value="nextEpisode">Jump to Next Episode Immediately</option>
+            <option value="disabled">Disabled (Do nothing)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label for="cfg_kodiCreditsPromptDuration" class="setting-label">Credits Prompt Duration</label>
+            <span class="setting-desc">Seconds to display the credits skip prompt before hiding.</span>
+          </div>
+          <div class="input-unit">
+            <input type="number" id="cfg_kodiCreditsPromptDuration" min="3" max="60" value="10" />
+            <span class="unit-tag">sec</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Path Prefix Translation</div>
+            <div class="card-desc">Optional prefix mapping between Kodi client mount points and IntroSkipper server paths</div>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label for="cfg_kodiPathPrefixClient" class="setting-label">Client Path Prefix</label>
+            <span class="setting-desc">Path prefix as seen by Kodi (e.g. smb://192.168.0.100/Media/ or /storage/recordings/)</span>
+          </div>
+          <input type="text" id="cfg_kodiPathPrefixClient" placeholder="e.g. smb://192.168.0.100/Media/" style="max-width: none; flex: 1;" />
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <label for="cfg_kodiPathPrefixServer" class="setting-label">Server Path Prefix</label>
+            <span class="setting-desc">Corresponding path on the IntroSkipper server (e.g. /media/ or smb://192.168.0.100/Media/)</span>
+          </div>
+          <input type="text" id="cfg_kodiPathPrefixServer" placeholder="e.g. /mnt/media/" style="max-width: none; flex: 1;" />
         </div>
       </div>
     </div>
@@ -1267,6 +1365,33 @@ public static class DashboardPage
         modeEl.onchange = markDirty;
       }
 
+      // Kodi Settings
+      const kodiIntroEl = document.getElementById('cfg_kodiIntroAction');
+      if (kodiIntroEl) {
+        kodiIntroEl.value = cfg.kodiIntroAction || 'prompt';
+        kodiIntroEl.onchange = markDirty;
+      }
+      const kodiCreditsEl = document.getElementById('cfg_kodiCreditsAction');
+      if (kodiCreditsEl) {
+        kodiCreditsEl.value = cfg.kodiCreditsAction || 'prompt';
+        kodiCreditsEl.onchange = markDirty;
+      }
+      const kodiDurationEl = document.getElementById('cfg_kodiCreditsPromptDuration');
+      if (kodiDurationEl) {
+        kodiDurationEl.value = cfg.kodiCreditsPromptDuration ?? 10;
+        kodiDurationEl.oninput = markDirty;
+      }
+      const kodiClientPrefixEl = document.getElementById('cfg_kodiPathPrefixClient');
+      if (kodiClientPrefixEl) {
+        kodiClientPrefixEl.value = cfg.kodiPathPrefixClient || '';
+        kodiClientPrefixEl.oninput = markDirty;
+      }
+      const kodiServerPrefixEl = document.getElementById('cfg_kodiPathPrefixServer');
+      if (kodiServerPrefixEl) {
+        kodiServerPrefixEl.value = cfg.kodiPathPrefixServer || '';
+        kodiServerPrefixEl.oninput = markDirty;
+      }
+
       // Range
       if (cfg.analysisPercent) {
         rangeSlider.value = cfg.analysisPercent;
@@ -1325,6 +1450,17 @@ public static class DashboardPage
       cfg.firstEpisodeIntroMode = document.getElementById('cfg_firstEpisodeIntroMode').value;
       cfg.seriesExclusions = [...seriesExclusions];
       cfg.pathExclusions = [...pathExclusions];
+
+      const kIntro = document.getElementById('cfg_kodiIntroAction');
+      if (kIntro) cfg.kodiIntroAction = kIntro.value;
+      const kCredits = document.getElementById('cfg_kodiCreditsAction');
+      if (kCredits) cfg.kodiCreditsAction = kCredits.value;
+      const kDuration = document.getElementById('cfg_kodiCreditsPromptDuration');
+      if (kDuration) cfg.kodiCreditsPromptDuration = parseInt(kDuration.value, 10) || 10;
+      const kClientPrefix = document.getElementById('cfg_kodiPathPrefixClient');
+      if (kClientPrefix) cfg.kodiPathPrefixClient = kClientPrefix.value;
+      const kServerPrefix = document.getElementById('cfg_kodiPathPrefixServer');
+      if (kServerPrefix) cfg.kodiPathPrefixServer = kServerPrefix.value;
 
       return cfg;
     }
@@ -1475,8 +1611,175 @@ public static class DashboardPage
       }
     });
 
+    // Sources Management
+    let currentSources = [];
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function escapeAttr(str) {
+      if (!str) return '';
+      return String(str).replace(/"/g, "&quot;");
+    }
+
+    async function loadSources() {
+      try {
+        const res = await fetch('/api/sources');
+        if (res.ok) {
+          currentSources = await res.json();
+          renderSources(currentSources);
+        }
+      } catch (err) {
+        console.error('Failed to load sources:', err);
+      }
+    }
+
+    function renderSources(sources) {
+      const container = document.getElementById('sourcesList');
+      if (!container) return;
+      if (!sources || sources.length === 0) {
+        container.innerHTML = '<div style="color: var(--text-dim); font-size: 0.85rem; padding: 8px 0;">No media sources configured yet. Add a directory or network share below.</div>';
+        return;
+      }
+      container.innerHTML = sources.map(src => `
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(255, 255, 255, 0.03); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+          <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; margin-right: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(src.name || 'Media Source')}</span>
+              <span style="font-size: 0.75rem; padding: 1px 7px; border-radius: 9999px; background: ${src.enabled ? 'rgba(16, 185, 129, 0.15); color: #34d399;' : 'rgba(156, 163, 175, 0.15); color: #9ca3af;'}">${src.enabled ? 'Enabled' : 'Disabled'}</span>
+            </div>
+            <span style="font-size: 0.82rem; color: var(--text-dim); word-break: break-all; font-family: monospace;">${escapeHtml(src.path)}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+            <label class="switch" title="Toggle scanning for this source">
+              <input type="checkbox" class="source-toggle" data-path="${escapeAttr(src.path)}" ${src.enabled ? 'checked' : ''}>
+              <span class="slider"></span>
+            </label>
+            <button class="btn btn-secondary source-scan-btn" data-path="${escapeAttr(src.path)}" title="Scan this source" style="padding: 5px 9px; font-size: 0.8rem;">▶</button>
+            <button class="btn btn-danger source-del-btn" data-path="${escapeAttr(src.path)}" title="Remove source" style="padding: 5px 9px; font-size: 0.8rem;">🗑</button>
+          </div>
+        </div>
+      `).join('');
+
+      container.querySelectorAll('.source-toggle').forEach(el => {
+        el.addEventListener('change', async () => {
+          const path = el.dataset.path;
+          const enabled = el.checked;
+          const src = currentSources.find(s => s.path === path);
+          try {
+            const res = await fetch('/api/sources', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: src ? src.name : '', path, enabled })
+            });
+            if (res.ok) {
+              showToast(`Source ${enabled ? 'enabled' : 'disabled'}`);
+              loadSources();
+            } else {
+              showToast('Failed to update source', false);
+            }
+          } catch (e) {
+            showToast('Error: ' + e, false);
+          }
+        });
+      });
+
+      container.querySelectorAll('.source-scan-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const path = btn.dataset.path;
+          const exportEdl = document.getElementById('quickScanEdl').checked;
+          try {
+            const res = await fetch('/api/scan', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ path, exportEdl })
+            });
+            if (res.ok) {
+              showToast('Scan enqueued for: ' + path);
+              updateStatus();
+            } else {
+              showToast('Failed to start scan', false);
+            }
+          } catch (e) {
+            showToast('Error: ' + e, false);
+          }
+        });
+      });
+
+      container.querySelectorAll('.source-del-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const path = btn.dataset.path;
+          if (!confirm('Remove scan source:\n' + path + '?')) return;
+          try {
+            const res = await fetch('/api/sources?path=' + encodeURIComponent(path), { method: 'DELETE' });
+            if (res.ok) {
+              showToast('Source removed');
+              loadSources();
+            } else {
+              showToast('Failed to remove source', false);
+            }
+          } catch (e) {
+            showToast('Error: ' + e, false);
+          }
+        });
+      });
+    }
+
+    document.getElementById('addSourceBtn').addEventListener('click', async () => {
+      const nameInp = document.getElementById('newSourceName');
+      const pathInp = document.getElementById('newSourcePath');
+      const name = nameInp.value.trim();
+      const path = pathInp.value.trim();
+      if (!path) {
+        alert('Please enter a source folder or network share path.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/sources', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, path, enabled: true })
+        });
+        if (res.ok) {
+          showToast('Source added successfully');
+          nameInp.value = '';
+          pathInp.value = '';
+          loadSources();
+        } else {
+          showToast('Failed to add source', false);
+        }
+      } catch (e) {
+        showToast('Error: ' + e, false);
+      }
+    });
+
+    document.getElementById('scanAllSourcesBtn').addEventListener('click', async () => {
+      const enabled = currentSources.filter(s => s.enabled);
+      if (enabled.length === 0) {
+        alert('No scan sources are currently enabled.');
+        return;
+      }
+      const exportEdl = document.getElementById('quickScanEdl').checked;
+      for (const src of enabled) {
+        try {
+          await fetch('/api/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: src.path, exportEdl })
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      showToast(`Enqueued ${enabled.length} source(s) for scanning`);
+      updateStatus();
+    });
+
     // Init
     loadConfig();
+    loadSources();
     updateStatus();
     setInterval(updateStatus, 3000);
   </script>

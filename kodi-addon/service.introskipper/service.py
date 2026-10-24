@@ -5,12 +5,23 @@
 import json
 import math
 import os
+import sys
 import time
 import urllib.parse
 import urllib.request
 import xbmc
 import xbmcaddon
 import xbmcgui
+
+try:
+    import sources
+except ImportError:
+    try:
+        from . import sources
+    except ImportError:
+        sys.path.append(os.path.dirname(__file__))
+        import sources
+
 
 ADDON_ID = 'service.introskipper'
 try:
@@ -40,6 +51,104 @@ def get_setting(key, default=""):
         except Exception:
             return default
     return default
+
+
+def get_server_url():
+    return get_setting('server_url', 'http://127.0.0.1:8037').rstrip('/')
+
+
+# Server <-> Kodi Settings synchronization
+_syncing_from_server = False
+
+
+def pull_settings_from_server(server_url=None):
+    """
+    Pulls Kodi playback settings from the IntroSkipper server and applies them locally.
+    """
+    global _syncing_from_server
+    if not server_url:
+        server_url = get_server_url()
+    url = f"{server_url}/api/kodi/settings"
+
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Kodi-IntroSkipper/1.0'})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode('utf-8'))
+                intro_act = data.get('introAction', 'prompt')
+                credits_act = data.get('creditsAction', 'prompt')
+                credits_dur = data.get('creditsPromptDuration', 10)
+                client_pfx = data.get('pathPrefixClient', '')
+                server_pfx = data.get('pathPrefixServer', '')
+
+                intro_map = {'prompt': '0', 'autoskip': '1', 'disabled': '2'}
+                credits_map = {'prompt': '0', 'autoskip': '1', 'nextEpisode': '2', 'next_episode': '2', 'disabled': '3'}
+
+                new_intro = intro_map.get(intro_act, '0')
+                new_credits = credits_map.get(credits_act, '0')
+
+                _syncing_from_server = True
+                try:
+                    if ADDON:
+                        if get_setting('intro_action') != new_intro:
+                            ADDON.setSetting('intro_action', new_intro)
+                        if get_setting('credits_action') != new_credits:
+                            ADDON.setSetting('credits_action', new_credits)
+                        if get_setting_int('credits_prompt_duration') != credits_dur:
+                            ADDON.setSettingInt('credits_prompt_duration', int(credits_dur))
+                        if get_setting('path_prefix_client') != client_pfx:
+                            ADDON.setSetting('path_prefix_client', client_pfx)
+                        if get_setting('path_prefix_server') != server_pfx:
+                            ADDON.setSetting('path_prefix_server', server_pfx)
+                finally:
+                    _syncing_from_server = False
+
+                log(f"Synchronized playback settings from server (Intro: {intro_act}, Credits: {credits_act})")
+                return True
+    except Exception as ex:
+        log(f"Failed to pull settings from server: {ex}", xbmc.LOGDEBUG)
+    return False
+
+
+def push_settings_to_server(server_url=None):
+    """
+    Pushes local Kodi playback settings to the IntroSkipper server.
+    """
+    if _syncing_from_server:
+        return False
+
+    if not server_url:
+        server_url = get_server_url()
+    url = f"{server_url}/api/kodi/settings"
+
+    intro_val = get_setting('intro_action', '0')
+    credits_val = get_setting('credits_action', '0')
+    intro_map = {'0': 'prompt', '1': 'autoskip', '2': 'disabled'}
+    credits_map = {'0': 'prompt', '1': 'autoskip', '2': 'nextEpisode', '3': 'disabled'}
+
+    payload = {
+        'introAction': intro_map.get(str(intro_val), 'prompt'),
+        'creditsAction': credits_map.get(str(credits_val), 'prompt'),
+        'creditsPromptDuration': get_setting_int('credits_prompt_duration', 10),
+        'pathPrefixClient': get_setting('path_prefix_client', ''),
+        'pathPrefixServer': get_setting('path_prefix_server', '')
+    }
+
+    try:
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={'Content-Type': 'application/json', 'User-Agent': 'Kodi-IntroSkipper/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            if resp.status == 200:
+                log("Pushed Kodi playback settings to server successfully.")
+                return True
+    except Exception as ex:
+        log(f"Failed to push settings to server: {ex}", xbmc.LOGWARNING)
+    return False
+
 
 
 def get_setting_int(key, default=0):
@@ -396,15 +505,39 @@ class IntroSkipperMonitor(xbmc.Monitor):
     def __init__(self):
         super().__init__()
 
+    def onSettingsChanged(self):
+        super().onSettingsChanged()
+        if not _syncing_from_server:
+            log("Kodi settings changed; pushing updates to IntroSkipper server...")
+            push_settings_to_server()
+
 
 def run():
     log("Starting IntroSkipper Kodi service...")
     monitor = IntroSkipperMonitor()
     player = IntroSkipperPlayer(monitor)
 
+    server_url = get_server_url()
+
+    # Initial bidirectional sync on startup
+    pull_settings_from_server(server_url)
+    try:
+        sources.sync_sources_with_server(server_url)
+    except Exception as ex:
+        log(f"Error during startup source sync: {ex}", xbmc.LOGDEBUG)
+
+    last_periodic_sync = time.time()
+    sync_interval = 60.0
+
     while not monitor.abortRequested():
         if monitor.waitForAbort(0.25):
             break
+
+        now = time.time()
+        if now - last_periodic_sync >= sync_interval:
+            last_periodic_sync = now
+            if not player.is_tracking:
+                pull_settings_from_server(server_url)
 
         if not player.is_tracking:
             continue

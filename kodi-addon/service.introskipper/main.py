@@ -232,29 +232,33 @@ def show_status():
 
 
 def manage_sources():
-    all_sources = sources.get_video_sources()
+    server_url = get_server_url()
+    all_sources = sources.sync_sources_with_server(server_url)
+    if not all_sources:
+        all_sources = sources.get_video_sources()
+
     if not all_sources:
         if xbmcgui:
             xbmcgui.Dialog().ok(
                 ADDON_NAME,
-                "No video sources found in Kodi's sources.xml.\n\nPlease add your media folders under Settings -> Media -> Videos first."
+                "No media sources found in Kodi's sources.xml or IntroSkipper server.\n\nPlease add your media folders under Settings -> Media -> Videos or via the IntroSkipper web interface."
             )
         else:
-            print("No video sources found in Kodi's sources.xml.")
+            print("No media sources found.")
         return
 
     if not xbmcgui:
-        print(f"=== Scan Sources ({len(all_sources)} found in sources.xml) ===")
+        print(f"=== Scan Sources ({len(all_sources)} sources) ===")
         for s in all_sources:
-            status_mark = "[X]" if s['enabled'] else "[ ]"
-            print(f" {status_mark} {s['name']} ({s['path']})")
+            status_mark = "[X]" if s.get('enabled') else "[ ]"
+            print(f" {status_mark} {s.get('name', 'Media')} ({s.get('path', '')})")
         return
 
     labels = []
     preselect = []
     for i, s in enumerate(all_sources):
-        labels.append(f"{s['name']}  ({s['path']})")
-        if s['enabled']:
+        labels.append(f"{s.get('name', 'Media')}  ({s.get('path', '')})")
+        if s.get('enabled'):
             preselect.append(i)
 
     dialog = xbmcgui.Dialog()
@@ -269,17 +273,25 @@ def manage_sources():
         return
 
     states = {}
+    updated_sources = []
     enabled_count = 0
     for i, s in enumerate(all_sources):
         is_active = i in selected_indices
-        states[s['path']] = is_active
+        p = s.get('path', '')
+        states[p] = is_active
+        updated_sources.append({
+            'name': s.get('name', ''),
+            'path': p,
+            'enabled': is_active
+        })
         if is_active:
             enabled_count += 1
 
     sources.save_saved_states(states)
+    sources.push_sources_to_server(server_url, updated_sources)
     dialog.notification(
         ADDON_NAME,
-        f"Saved: {enabled_count} of {len(all_sources)} sources enabled",
+        f"Saved: {enabled_count} of {len(all_sources)} sources enabled (synced to server)",
         xbmcgui.NOTIFICATION_INFO,
         3000
     )
@@ -294,7 +306,7 @@ def map_path(path):
 
 
 def trigger_scan():
-    enabled_paths = sources.get_enabled_paths()
+    enabled_paths = sources.get_enabled_paths(get_server_url())
     if not enabled_paths:
         if xbmcgui:
             dialog = xbmcgui.Dialog()
