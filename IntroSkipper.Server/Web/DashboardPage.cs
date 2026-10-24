@@ -762,6 +762,18 @@ public static class DashboardPage
             </div>
           </div>
         </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <label for="cfg_maxParallelism" class="setting-label">Maximum Parallel Analysis Tasks</label>
+            <span class="setting-desc">Number of concurrent FFmpeg media probing and audio fingerprinting tasks (default: 2). Higher values speed up analysis on multi-core CPUs.</span>
+          </div>
+          <div class="setting-ctrl">
+            <div class="input-unit">
+              <input type="number" id="cfg_maxParallelism" min="1" max="16" />
+              <span class="unit-tag">tasks</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="card">
@@ -1376,6 +1388,7 @@ public static class DashboardPage
       // Numbers & Text
       const valKeys = [
         'settledSeasonDelayHours', 'settledSeasonChromaprintConsensusEpisodes',
+        'maxParallelism',
         'analysisLengthLimit', 'preferredAudioLanguage', 'minimumIntroDuration',
         'maximumIntroDuration', 'minimumCreditsDuration', 'maximumCreditsDuration',
         'minimumRecapDuration', 'maximumRecapDuration', 'chapterAnalyzerIntroductionPattern',
@@ -1460,13 +1473,17 @@ public static class DashboardPage
 
       const numKeys = [
         'settledSeasonDelayHours', 'settledSeasonChromaprintConsensusEpisodes',
+        'maxParallelism',
         'analysisLengthLimit', 'minimumIntroDuration', 'maximumIntroDuration',
         'minimumCreditsDuration', 'maximumCreditsDuration', 'minimumRecapDuration',
         'maximumRecapDuration', 'blackFrameMinimumPercentage', 'blackFrameThreshold'
       ];
       numKeys.forEach(k => {
         const el = document.getElementById('cfg_' + k);
-        if (el) cfg[k] = parseInt(el.value, 10) || 0;
+        if (el) {
+          const parsed = parseInt(el.value, 10);
+          cfg[k] = k === 'maxParallelism' ? Math.max(1, parsed || 2) : (parsed || 0);
+        }
       });
 
       const strKeys = [
