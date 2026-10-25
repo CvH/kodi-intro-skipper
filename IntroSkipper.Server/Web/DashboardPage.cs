@@ -1769,8 +1769,7 @@ public static class DashboardPage
         },
 
         async removeSource(path) {
-          if (!confirm('Remove scan source:
-' + path + '?')) return;
+          if (!confirm(`Remove scan source:\n${path}?`)) return;
           try {
             const res = await fetch('/api/sources?path=' + encodeURIComponent(path), { method: 'DELETE' });
             if (res.ok) {
@@ -1812,6 +1811,10 @@ public static class DashboardPage
         }
       };
     }
+
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('dashboardApp', dashboardApp);
+    });
   </script>
 </body>
 </html>

@@ -53,6 +53,11 @@ public sealed class TestDashboardPage
         Assert.Contains("id=\"confirmSourceModal\"", html, StringComparison.Ordinal);
         Assert.Contains("x-show=\"confirmModal.open\"", html, StringComparison.Ordinal);
         Assert.Contains("id=\"toast\" class=\"toast\" :class=\"{ 'show': toast.show", html, StringComparison.Ordinal);
+
+        // Alpine component registration & script string integrity
+        Assert.Contains("Alpine.data('dashboardApp', dashboardApp)", html, StringComparison.Ordinal);
+        Assert.Contains("!confirm(`Remove scan source:\\n${path}?`)", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("'Remove scan source:\n", html, StringComparison.Ordinal);
     }
 
     [Fact]
