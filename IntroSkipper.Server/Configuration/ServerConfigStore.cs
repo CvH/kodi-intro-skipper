@@ -413,6 +413,7 @@ public sealed class ServerConfigStore
                     var loaded = JsonSerializer.Deserialize<PluginConfiguration>(json, JsonOptions);
                     if (loaded is not null)
                     {
+                        loaded.UpgradeLegacyDefaults();
                         _logger.LogInformation("Loaded configuration from {Path}", _configFilePath);
                         return loaded;
                     }
