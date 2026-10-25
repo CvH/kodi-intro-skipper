@@ -158,7 +158,7 @@ def show_stats():
     )
 
     if xbmcgui:
-        xbmcgui.Dialog().ok("IntroSkipper Library Statistics", msg)
+        xbmcgui.Dialog().textviewer("IntroSkipper Library Statistics", msg)
     else:
         clean = msg.replace('[B]', '').replace('[/B]', '')
         print("=== IntroSkipper Statistics ===")
@@ -225,7 +225,7 @@ def show_status():
         print(clean_msg)
         return
 
-    xbmcgui.Dialog().ok("IntroSkipper Status", msg)
+    xbmcgui.Dialog().textviewer("IntroSkipper Server Status", msg)
 
 
 

@@ -255,23 +255,201 @@ def get_webinterface_info(server_url='http://127.0.0.1:8037'):
     return lan_ip, port, full_url
 
 
+MEDIA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources', 'media')
+CARD_BG_TEX = os.path.join(MEDIA_DIR, 'card_bg.png')
+INNER_BOX_TEX = os.path.join(MEDIA_DIR, 'inner_box.png')
+BUTTON_FOCUS_TEX = os.path.join(MEDIA_DIR, 'button_focus.png')
+BUTTON_NOFOCUS_TEX = os.path.join(MEDIA_DIR, 'button_nofocus.png')
+
+
+class WebInterfaceDialog(xbmcgui.WindowDialog if xbmcgui else object):
+    """
+    Dedicated wide modal card overlay window displaying LAN IP, Port, and Web Dashboard URL.
+    """
+    def __init__(self, lan_ip, port, full_url, title="IntroSkipper Web Dashboard"):
+        if not xbmcgui:
+            return
+        super().__init__()
+        self.lan_ip = str(lan_ip)
+        self.port = str(port)
+        self.full_url = str(full_url)
+        self.title_text = title
+
+        # Layout dimensions for 1280x720 canvas
+        card_w, card_h = 740, 460
+        card_x = (1280 - card_w) // 2
+        card_y = (720 - card_h) // 2
+
+        # 1. Card background image
+        card_bg = CARD_BG_TEX if os.path.exists(CARD_BG_TEX) else ""
+        self.bg_img = xbmcgui.ControlImage(card_x, card_y, card_w, card_h, card_bg)
+        self.addControl(self.bg_img)
+
+        # 2. Header title and subtitle
+        self.title_lbl = xbmcgui.ControlLabel(
+            card_x + 30, card_y + 25, card_w - 60, 36,
+            f"[B]{self.title_text}[/B]",
+            font='font16',
+            textColor='0xFFFFFFFF',
+            alignment=2
+        )
+        self.addControl(self.title_lbl)
+
+        self.subtitle_lbl = xbmcgui.ControlLabel(
+            card_x + 30, card_y + 66, card_w - 60, 26,
+            "Connect from any web browser on your home network",
+            font='font12',
+            textColor='0xFF99AABB',
+            alignment=2
+        )
+        self.addControl(self.subtitle_lbl)
+
+        # 3. Two side-by-side cards: LAN IP and PORT
+        box_y = card_y + 105
+        box_h = 95
+        box1_x = card_x + 40
+        box_w = 315
+        box2_x = card_x + 385
+        inner_bg = INNER_BOX_TEX if os.path.exists(INNER_BOX_TEX) else ""
+
+        # LAN IP Box
+        self.box_ip = xbmcgui.ControlImage(box1_x, box_y, box_w, box_h, inner_bg)
+        self.addControl(self.box_ip)
+
+        self.lbl_ip_header = xbmcgui.ControlLabel(
+            box1_x + 20, box_y + 14, box_w - 40, 20,
+            "LOCAL NETWORK (LAN) IP",
+            font='font10',
+            textColor='0xFF7E98B4'
+        )
+        self.addControl(self.lbl_ip_header)
+
+        self.lbl_ip_val = xbmcgui.ControlLabel(
+            box1_x + 20, box_y + 38, box_w - 40, 42,
+            f"[B]{self.lan_ip}[/B]",
+            font='font16',
+            textColor='0xFFFFFFFF'
+        )
+        self.addControl(self.lbl_ip_val)
+
+        # PORT Box
+        self.box_port = xbmcgui.ControlImage(box2_x, box_y, box_w, box_h, inner_bg)
+        self.addControl(self.box_port)
+
+        self.lbl_port_header = xbmcgui.ControlLabel(
+            box2_x + 20, box_y + 14, box_w - 40, 20,
+            "SERVER PORT",
+            font='font10',
+            textColor='0xFF7E98B4'
+        )
+        self.addControl(self.lbl_port_header)
+
+        self.lbl_port_val = xbmcgui.ControlLabel(
+            box2_x + 20, box_y + 38, box_w - 40, 42,
+            f"[B]{self.port}[/B]",
+            font='font16',
+            textColor='0xFFFFFFFF'
+        )
+        self.addControl(self.lbl_port_val)
+
+        # 4. Full URL Box
+        url_y = card_y + 215
+        url_w = 660
+        url_h = 92
+        self.box_url = xbmcgui.ControlImage(box1_x, url_y, url_w, url_h, inner_bg)
+        self.addControl(self.box_url)
+
+        self.lbl_url_header = xbmcgui.ControlLabel(
+            box1_x + 20, url_y + 14, url_w - 40, 20,
+            "WEB DASHBOARD URL",
+            font='font10',
+            textColor='0xFF7E98B4'
+        )
+        self.addControl(self.lbl_url_header)
+
+        self.lbl_url_val = xbmcgui.ControlLabel(
+            box1_x + 20, url_y + 38, url_w - 40, 38,
+            f"[COLOR deepskyblue][B]{self.full_url}[/B][/COLOR]",
+            font='font14',
+            textColor='0xFF00BFFF'
+        )
+        self.addControl(self.lbl_url_val)
+
+        # 5. Helper instructions note
+        self.note_lbl = xbmcgui.ControlLabel(
+            card_x + 40, card_y + 322, card_w - 80, 24,
+            "Open this link in any browser (phone, PC, tablet) to manage IntroSkipper.",
+            font='font11',
+            textColor='0xFF7A8899',
+            alignment=2
+        )
+        self.addControl(self.note_lbl)
+
+        # 6. OK Button
+        btn_w, btn_h = 200, 48
+        btn_x = card_x + (card_w - btn_w) // 2
+        btn_y = card_y + 375
+        focus_tex = BUTTON_FOCUS_TEX if os.path.exists(BUTTON_FOCUS_TEX) else ""
+        nofocus_tex = BUTTON_NOFOCUS_TEX if os.path.exists(BUTTON_NOFOCUS_TEX) else ""
+
+        self.ok_btn = xbmcgui.ControlButton(
+            btn_x, btn_y, btn_w, btn_h,
+            "OK",
+            focusTexture=focus_tex,
+            noFocusTexture=nofocus_tex,
+            alignment=6,
+            textColor="0xFFFFFFFF",
+            focusedColor="0xFFFFFFFF"
+        )
+        self.addControl(self.ok_btn)
+        self.setFocus(self.ok_btn)
+
+    def onClick(self, controlId):
+        self.close()
+
+    def onAction(self, action):
+        aid = action.getId()
+        # 7: SELECT_ITEM, 11: ENTER, 100: MOUSE_LEFT_CLICK
+        # 9: NAV_BACK, 10: PREVIOUS_MENU, 92: BACK, 216: BACK
+        if aid in (7, 11, 100, 9, 10, 92, 216):
+            self.close()
+        else:
+            try:
+                super().onAction(action)
+            except Exception:
+                pass
+
+
 def show_webinterface_dialog(server_url='http://127.0.0.1:8037', title="IntroSkipper Web Dashboard"):
     """
     Displays a prominent popup dialog with the current LAN IP and port of the web interface.
+    Uses the custom wide WindowDialog with dedicated IP/port cards, falling back to textviewer.
     """
     lan_ip, port, full_url = get_webinterface_info(server_url)
-    msg = (
-        f"[B]IntroSkipper Web Dashboard[/B]\n\n"
-        f"Connect from any browser on your local network:\n\n"
-        f"  • [B]LAN IP:[/B]  {lan_ip}\n"
-        f"  • [B]Port:[/B]    {port}\n\n"
-        f"Web Dashboard URL:\n"
-        f"[COLOR deepskyblue][B]{full_url}[/B][/COLOR]"
-    )
+
     if xbmcgui:
-        xbmcgui.Dialog().ok(title, msg)
+        try:
+            dialog = WebInterfaceDialog(lan_ip, port, full_url, title)
+            dialog.doModal()
+            del dialog
+            return
+        except Exception as ex:
+            log(f"Custom WebInterfaceDialog error, falling back to textviewer: {ex}")
+
+        msg = (
+            f"[B]IntroSkipper Web Dashboard[/B]\n\n"
+            f"Connect from any web browser on your home network:\n\n"
+            f"  • [B]LAN IP:[/B]  {lan_ip}\n"
+            f"  • [B]Port:[/B]    {port}\n\n"
+            f"Web Dashboard URL:\n"
+            f"[COLOR deepskyblue][B]{full_url}[/B][/COLOR]\n\n"
+            f"Open this URL in any browser on your phone, PC, or tablet to access settings and scan management."
+        )
+        try:
+            xbmcgui.Dialog().textviewer(title, msg)
+        except Exception:
+            xbmcgui.Dialog().ok(title, msg)
     else:
-        clean = msg.replace('[B]', '').replace('[/B]', '').replace('[COLOR deepskyblue]', '').replace('[/COLOR]', '')
-        print(f"=== {title} ===\n{clean}")
+        print(f"=== {title} ===\nLAN IP: {lan_ip}\nPort: {port}\nURL: {full_url}")
 
 

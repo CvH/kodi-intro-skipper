@@ -68,5 +68,35 @@ def generate_assets():
 
     print(f"Generated button textures in {media_dir}")
 
+    # 3. Dialog Card Background (740x460) and Inner Box (660x100 reference)
+    card_w, card_h = 740, 460
+    card_scale = 2
+    im_card = Image.new('RGBA', (card_w * card_scale, card_h * card_scale), (0, 0, 0, 0))
+    draw_card = ImageDraw.Draw(im_card)
+    draw_card.rounded_rectangle(
+        [card_scale, card_scale, (card_w - 1) * card_scale, (card_h - 1) * card_scale],
+        radius=22 * card_scale,
+        fill=(18, 24, 34, 250),
+        outline=(60, 82, 115, 230),
+        width=2 * card_scale
+    )
+    card_out = im_card.resize((card_w, card_h), Image.Resampling.LANCZOS)
+    card_out.save(os.path.join(media_dir, 'card_bg.png'), optimize=True)
+
+    box_w, box_h = 660, 100
+    im_box = Image.new('RGBA', (box_w * card_scale, box_h * card_scale), (0, 0, 0, 0))
+    draw_box = ImageDraw.Draw(im_box)
+    draw_box.rounded_rectangle(
+        [card_scale, card_scale, (box_w - 1) * card_scale, (box_h - 1) * card_scale],
+        radius=12 * card_scale,
+        fill=(12, 16, 23, 235),
+        outline=(45, 62, 85, 200),
+        width=int(1.5 * card_scale)
+    )
+    box_out = im_box.resize((box_w, box_h), Image.Resampling.LANCZOS)
+    box_out.save(os.path.join(media_dir, 'inner_box.png'), optimize=True)
+
+    print(f"Generated dialog textures (card_bg.png, inner_box.png) in {media_dir}")
+
 if __name__ == '__main__':
     generate_assets()
