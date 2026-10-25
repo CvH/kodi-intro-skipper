@@ -26,6 +26,10 @@ msgctxt "#30004"
 msgid "Maximum seconds to wait for server response"
 msgstr "Maximale Wartezeit auf Serverantwort"
 
+msgctxt "#30005"
+msgid "Web Dashboard: View LAN IP & Port..."
+msgstr "Web-Dashboard: LAN-IP & Port anzeigen..."
+
 msgctxt "#30010"
 msgid "Skip Behavior"
 msgstr "Überspring-Verhalten"

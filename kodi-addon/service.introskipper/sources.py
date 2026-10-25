@@ -8,10 +8,12 @@ import xml.etree.ElementTree as ET
 try:
     import xbmc
     import xbmcaddon
+    import xbmcgui
     import xbmcvfs
 except ImportError:
     xbmc = None
     xbmcaddon = None
+    xbmcgui = None
     xbmcvfs = None
 
 ADDON_ID = 'service.introskipper'
@@ -215,4 +217,75 @@ def get_enabled_paths(server_url=None):
             pass
 
     return []
+
+
+def get_lan_ip(fallback='127.0.0.1'):
+    """
+    Detects the current device LAN IP address (excluding loopback).
+    """
+    if xbmc:
+        try:
+            kodi_ip = xbmc.getIPAddress().strip()
+            if kodi_ip and kodi_ip not in ('127.0.0.1', '0.0.0.0', ''):
+                return kodi_ip
+        except Exception:
+            pass
+
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.5)
+        s.connect(('10.255.255.255', 1))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and ip not in ('127.0.0.1', '0.0.0.0', ''):
+            return ip
+    except Exception:
+        pass
+
+    return fallback
+
+
+def get_webinterface_info(server_url='http://127.0.0.1:8037'):
+    """
+    Extracts the webinterface LAN IP, port, and full URL.
+    Resolves localhost/127.0.0.1 to the device's actual LAN IP.
+    """
+    try:
+        import urllib.parse
+        parsed = urllib.parse.urlsplit(server_url)
+        host = parsed.hostname or '127.0.0.1'
+        port = parsed.port or 8037
+    except Exception:
+        host = '127.0.0.1'
+        port = 8037
+
+    if host.lower() in ('127.0.0.1', 'localhost', '0.0.0.0', ''):
+        lan_ip = get_lan_ip(fallback=host)
+    else:
+        lan_ip = host
+
+    full_url = f"http://{lan_ip}:{port}"
+    return lan_ip, port, full_url
+
+
+def show_webinterface_dialog(server_url='http://127.0.0.1:8037', title="IntroSkipper Web Dashboard"):
+    """
+    Displays a prominent popup dialog with the current LAN IP and port of the web interface.
+    """
+    lan_ip, port, full_url = get_webinterface_info(server_url)
+    msg = (
+        f"[B]IntroSkipper Web Dashboard[/B]\n\n"
+        f"Connect from any browser on your local network:\n\n"
+        f"  • [B]LAN IP:[/B]  {lan_ip}\n"
+        f"  • [B]Port:[/B]    {port}\n\n"
+        f"Web Dashboard URL:\n"
+        f"[COLOR deepskyblue][B]{full_url}[/B][/COLOR]"
+    )
+    if xbmcgui:
+        xbmcgui.Dialog().ok(title, msg)
+    else:
+        clean = msg.replace('[B]', '').replace('[/B]', '').replace('[COLOR deepskyblue]', '').replace('[/COLOR]', '')
+        print(f"=== {title} ===\n{clean}")
+
 

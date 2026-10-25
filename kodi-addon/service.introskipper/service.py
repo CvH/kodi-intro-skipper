@@ -508,6 +508,7 @@ class IntroSkipperMonitor(xbmc.Monitor):
         if not _syncing_from_server:
             log("Kodi settings changed; pushing updates to IntroSkipper server...")
             push_settings_to_server()
+            sources.show_webinterface_dialog(get_server_url(), "IntroSkipper Settings Changed")
 
 
 def run():

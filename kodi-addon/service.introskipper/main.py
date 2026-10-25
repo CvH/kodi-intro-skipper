@@ -406,6 +406,9 @@ def main():
     elif arg == "stats":
         show_stats()
         return
+    elif arg == "web_hint":
+        sources.show_webinterface_dialog(get_server_url())
+        return
 
     # Default interactive menu when launched from Kodi UI
     status = fetch_server_status()
@@ -437,6 +440,10 @@ def main():
     action_map[next_idx] = "stats"
     next_idx += 1
 
+    options.append(f"{next_idx + 1}. Web Dashboard URL (LAN IP & Port)...")
+    action_map[next_idx] = "web_hint"
+    next_idx += 1
+
     options.append(f"{next_idx + 1}. Add-on Settings...")
     action_map[next_idx] = "settings"
 
@@ -454,7 +461,10 @@ def main():
             live_monitor()
         elif action == "stats":
             show_stats()
+        elif action == "web_hint":
+            sources.show_webinterface_dialog(server_url)
         elif action == "settings":
+            sources.show_webinterface_dialog(server_url, "IntroSkipper Web Dashboard")
             if ADDON:
                 ADDON.openSettings()
 

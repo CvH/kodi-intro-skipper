@@ -3,6 +3,7 @@
     <category label="30000"> <!-- Connection -->
         <setting label="30001" type="text" id="server_url" default="http://127.0.0.1:8037"/>
         <setting label="30003" type="slider" id="request_timeout" default="3" range="1,1,10" option="int"/>
+        <setting label="30005" type="action" id="web_interface_hint_btn" action="RunScript(service.introskipper,web_hint)"/>
     </category>
 
     <category label="30010"> <!-- Skip Behavior -->
