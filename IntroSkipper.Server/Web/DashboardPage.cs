@@ -615,11 +615,11 @@ public static class DashboardPage
             </div>
           </div>
 
-          <template x-if="sources.length === 0">
+          <template x-if="sortedSources.length === 0">
             <div style="color: var(--text-dim); font-size: 0.85rem; padding: 8px 0;">No media sources configured yet. Add a directory or network share below.</div>
           </template>
 
-          <template x-for="src in sources" :key="src.path">
+          <template x-for="src in sortedSources" :key="src.path">
             <div :style="(() => {
               const isTv = (src.contentType || 'tvshows').toLowerCase() === 'tvshows';
               const opacity = isTv ? '1' : (src.enabled ? '0.75' : '0.45');
@@ -1477,6 +1477,14 @@ public static class DashboardPage
           return this.sources.some(s => (s.contentType || 'tvshows').toLowerCase() !== 'tvshows' && s.enabled);
         },
 
+        get sortedSources() {
+          return (this.sources || []).slice().sort((a, b) => {
+            const nameA = a.name || a.path || '';
+            const nameB = b.name || b.path || '';
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true });
+          });
+        },
+
         get statusBadgeClass() {
           if (this.status.status === 'Disconnected') return 'status-badge offline';
           if (this.status.isScanning) return 'status-badge scanning';
@@ -1659,7 +1667,14 @@ public static class DashboardPage
           try {
             const res = await fetch('/api/sources');
             if (res.ok) {
-              this.sources = await res.json();
+              const data = await res.json();
+              this.sources = Array.isArray(data)
+                ? data.sort((a, b) => {
+                    const nameA = a.name || a.path || '';
+                    const nameB = b.name || b.path || '';
+                    return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true });
+                  })
+                : [];
             }
           } catch (err) {
             console.error('Failed to load sources:', err);
@@ -1747,7 +1762,7 @@ public static class DashboardPage
         },
 
         async scanAllSources() {
-          const enabled = this.sources.filter(s => s.enabled);
+          const enabled = this.sortedSources.filter(s => s.enabled);
           if (enabled.length === 0) {
             alert('No scan sources are currently enabled.');
             return;

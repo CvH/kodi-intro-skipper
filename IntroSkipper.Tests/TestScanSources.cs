@@ -87,4 +87,36 @@ public sealed class TestScanSources
         Assert.True(customRemoved);
         Assert.DoesNotContain(store.GetScanSources(), s => s.Path == "/mnt/media/custom");
     }
+
+    [Fact]
+    public void GetScanSources_AlwaysSortedByNameRegardlessOfEnabledState()
+    {
+        using var temp = new TempDirectory();
+        var paths = new ServerPaths(temp.Info.FullName);
+        var store = new ServerConfigStore(paths, NullLogger<ServerConfigStore>.Instance);
+
+        // Add shares in mixed order and varying enabled/disabled states
+        store.SetScanSource("Zebra Series", "/media/zebra", enabled: true);
+        store.SetScanSource("Alpha Shows", "/media/alpha", enabled: false);
+        store.SetScanSource("Middle Content", "/media/middle", enabled: true);
+        store.SetScanSource("Beta Anime", "/media/beta", enabled: false);
+
+        var sources = store.GetScanSources();
+
+        Assert.Equal(4, sources.Count);
+        Assert.Equal("Alpha Shows", sources[0].Name);
+        Assert.Equal("Beta Anime", sources[1].Name);
+        Assert.Equal("Middle Content", sources[2].Name);
+        Assert.Equal("Zebra Series", sources[3].Name);
+
+        // Toggle enabled state of items and verify order remains alphabetical by name
+        store.SetScanSource("Alpha Shows", "/media/alpha", enabled: true);
+        store.SetScanSource("Zebra Series", "/media/zebra", enabled: false);
+
+        var resynced = store.GetScanSources();
+        Assert.Equal("Alpha Shows", resynced[0].Name);
+        Assert.Equal("Beta Anime", resynced[1].Name);
+        Assert.Equal("Middle Content", resynced[2].Name);
+        Assert.Equal("Zebra Series", resynced[3].Name);
+    }
 }

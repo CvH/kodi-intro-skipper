@@ -49,7 +49,8 @@ public sealed class TestDashboardPage
         Assert.Contains("x-model.number=\"config.settledSeasonDelayHours\"", html, StringComparison.Ordinal);
 
         // Media sources template & modal
-        Assert.Contains("<template x-for=\"src in sources\"", html, StringComparison.Ordinal);
+        Assert.Contains("<template x-for=\"src in sortedSources\"", html, StringComparison.Ordinal);
+        Assert.Contains("get sortedSources()", html, StringComparison.Ordinal);
         Assert.Contains("id=\"confirmSourceModal\"", html, StringComparison.Ordinal);
         Assert.Contains("x-show=\"confirmModal.open\"", html, StringComparison.Ordinal);
         Assert.Contains("id=\"toast\" class=\"toast\" :class=\"{ 'show': toast.show", html, StringComparison.Ordinal);

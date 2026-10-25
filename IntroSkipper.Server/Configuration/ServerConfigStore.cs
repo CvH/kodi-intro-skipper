@@ -203,14 +203,17 @@ public sealed class ServerConfigStore
     }
 
     /// <summary>
-    /// Gets all configured media scan source paths.
+    /// Gets all configured media scan source paths, sorted alphabetically by source name (or path).
     /// </summary>
     /// <returns>A read-only list of configured sources.</returns>
     public IReadOnlyList<ScanSource> GetScanSources()
     {
         lock (_syncLock)
         {
-            return Current.ScanSources.ToList();
+            return Current.ScanSources
+                .OrderBy(s => string.IsNullOrWhiteSpace(s.Name) ? s.Path : s.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(s => s.Path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
     }
 
@@ -331,7 +334,10 @@ public sealed class ServerConfigStore
                 Save();
             }
 
-            return Current.ScanSources.ToList();
+            return Current.ScanSources
+                .OrderBy(s => string.IsNullOrWhiteSpace(s.Name) ? s.Path : s.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(s => s.Path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
     }
 
