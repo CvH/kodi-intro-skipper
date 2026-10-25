@@ -2014,6 +2014,7 @@ public static class DashboardPage
 """;
 
     private static readonly byte[] FontBytes = LoadEmbeddedFont();
+    private static readonly byte[] AlpineBytes = LoadEmbeddedAlpine();
 
     /// <summary>
     /// Returns the full HTML string for the web dashboard.
@@ -2027,10 +2028,30 @@ public static class DashboardPage
     /// <returns>Raw byte array of the font file.</returns>
     public static byte[] GetFontBytes() => FontBytes;
 
+    /// <summary>
+    /// Returns the bundled Alpine.js script binary.
+    /// </summary>
+    /// <returns>Raw byte array of the script file.</returns>
+    public static byte[] GetAlpineBytes() => AlpineBytes;
+
     private static byte[] LoadEmbeddedFont()
     {
         var assembly = typeof(DashboardPage).Assembly;
         using var stream = assembly.GetManifestResourceStream("IntroSkipper.Server.Web.Fonts.inter.woff2");
+        if (stream is null)
+        {
+            return [];
+        }
+
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        return ms.ToArray();
+    }
+
+    private static byte[] LoadEmbeddedAlpine()
+    {
+        var assembly = typeof(DashboardPage).Assembly;
+        using var stream = assembly.GetManifestResourceStream("IntroSkipper.Server.Web.Scripts.alpine.min.js");
         if (stream is null)
         {
             return [];

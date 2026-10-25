@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Web/Fonts/inter.woff2" />
+    <EmbeddedResource Include="Web/Scripts/alpine.min.js" />
   </ItemGroup>
 
   <Target Name="GeneratePathDefaults" BeforeTargets="CoreCompile">

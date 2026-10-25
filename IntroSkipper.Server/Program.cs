@@ -540,5 +540,6 @@ app.MapPost("/api/kodi/settings", (
 app.MapGet("/", () => Results.Content(DashboardPage.GetHtml(), "text/html"));
 app.MapGet("/settings", () => Results.Content(DashboardPage.GetHtml(), "text/html"));
 app.MapGet("/fonts/inter.woff2", () => Results.Bytes(DashboardPage.GetFontBytes(), "font/woff2"));
+app.MapGet("/js/alpine.min.js", () => Results.Bytes(DashboardPage.GetAlpineBytes(), "application/javascript"));
 
 await app.RunAsync().ConfigureAwait(false);
