@@ -15,7 +15,9 @@ public static class DashboardPage
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>IntroSkipper Dashboard</title>
+  <script defer src="/js/alpine.min.js"></script>
   <style>
+    [x-cloak] { display: none !important; }
     @font-face {
       font-family: 'Inter';
       font-style: normal;
@@ -466,7 +468,7 @@ public static class DashboardPage
     }
   </style>
 </head>
-<body>
+<body x-data="dashboardApp()" x-cloak>
   <header>
     <div class="header-content">
       <a href="#" class="brand">
@@ -528,67 +530,67 @@ public static class DashboardPage
 
       </a>
       <div style="display: flex; align-items: center; gap: 12px;">
-        <div id="statusBadge" class="status-badge">
+        <div id="statusBadge" class="status-badge" :class="statusBadgeClass">
           <span class="status-dot"></span>
-          <span id="statusText">Connecting...</span>
+          <span id="statusText" x-text="statusBadgeText">Connecting...</span>
         </div>
-        <button id="resetDefaultsBtn" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Reset Defaults</button>
+        <button id="resetDefaultsBtn" class="btn btn-secondary" @click="resetConfig()" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Reset Defaults</button>
       </div>
     </div>
   </header>
 
   <nav class="nav-tabs">
     <div class="tabs-container">
-      <button class="tab-btn active" data-tab="tab-overview">📊 Overview</button>
-      <button class="tab-btn" data-tab="tab-kodi">📺 Kodi & Playback</button>
-      <button class="tab-btn" data-tab="tab-general">⚙️ General</button>
-      <button class="tab-btn" data-tab="tab-audio">🎵 Audio & Fingerprint</button>
-      <button class="tab-btn" data-tab="tab-detection">⏱️ Detection Rules</button>
-      <button class="tab-btn" data-tab="tab-chapters">📑 Chapters & Patterns</button>
-      <button class="tab-btn" data-tab="tab-visuals">🎬 Visuals & Black Frame</button>
+      <button class="tab-btn" :class="{ 'active': activeTab === 'tab-overview' }" @click="activeTab = 'tab-overview'">📊 Overview</button>
+      <button class="tab-btn" :class="{ 'active': activeTab === 'tab-kodi' }" @click="activeTab = 'tab-kodi'">📺 Kodi & Playback</button>
+      <button class="tab-btn" :class="{ 'active': activeTab === 'tab-general' }" @click="activeTab = 'tab-general'">⚙️ General</button>
+      <button class="tab-btn" :class="{ 'active': activeTab === 'tab-audio' }" @click="activeTab = 'tab-audio'">🎵 Audio & Fingerprint</button>
+      <button class="tab-btn" :class="{ 'active': activeTab === 'tab-detection' }" @click="activeTab = 'tab-detection'">⏱️ Detection Rules</button>
+      <button class="tab-btn" :class="{ 'active': activeTab === 'tab-chapters' }" @click="activeTab = 'tab-chapters'">📑 Chapters & Patterns</button>
+      <button class="tab-btn" :class="{ 'active': activeTab === 'tab-visuals' }" @click="activeTab = 'tab-visuals'">🎬 Visuals & Black Frame</button>
     </div>
   </nav>
 
   <main>
     <!-- TAB 1: OVERVIEW -->
-    <div id="tab-overview" class="tab-panel active">
+    <div id="tab-overview" class="tab-panel" :class="{ 'active': activeTab === 'tab-overview' }">
       <div class="grid-kpi">
         <div class="kpi-card">
           <div class="kpi-label">Indexed Shows</div>
-          <div id="kpiSeries" class="kpi-value">0</div>
+          <div id="kpiSeries" class="kpi-value" x-text="stats.totalSeries || 0">0</div>
           <div class="kpi-sub">Total series in library</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Analyzed Episodes</div>
-          <div id="kpiEpisodes" class="kpi-value">0</div>
+          <div id="kpiEpisodes" class="kpi-value" x-text="stats.totalEpisodes || 0">0</div>
           <div class="kpi-sub">Episodes with segments</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Detected Segments</div>
-          <div id="kpiSegments" class="kpi-value">0</div>
-          <div id="kpiSegmentBreakdown" class="kpi-sub">0 Intros • 0 Credits</div>
+          <div id="kpiSegments" class="kpi-value" x-text="stats.totalSegments || 0">0</div>
+          <div id="kpiSegmentBreakdown" class="kpi-sub" x-text="`${stats.introCount || 0} Intros • ${stats.creditsCount || 0} Credits`">0 Intros • 0 Credits</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Time Saved</div>
-          <div id="kpiTimeSaved" class="kpi-value">0s</div>
+          <div id="kpiTimeSaved" class="kpi-value" x-text="stats.formattedSkippedTime || '0s'">0s</div>
           <div class="kpi-sub">Accumulated skip time</div>
         </div>
       </div>
 
       <!-- Scan status card -->
-      <div id="scanStatusCard" class="card" style="display: none;">
+      <div id="scanStatusCard" class="card" x-show="scan.isScanning" x-cloak x-transition>
         <div class="card-header">
           <div>
             <div class="card-title">🚀 Active Library Scan</div>
-            <div id="scanStageLabel" class="card-desc">Analyzing...</div>
+            <div id="scanStageLabel" class="card-desc" x-text="scan.currentStage || 'Analyzing...'">Analyzing...</div>
           </div>
-          <button id="stopScanBtn" class="btn btn-danger">Stop Scan</button>
+          <button id="stopScanBtn" class="btn btn-danger" @click="stopScan()">Stop Scan</button>
         </div>
-        <div id="scanFileLabel" style="font-size: 0.85rem; color: #a5b4fc; word-break: break-all;"></div>
+        <div id="scanFileLabel" style="font-size: 0.85rem; color: #a5b4fc; word-break: break-all;" x-text="scan.currentFile || ''"></div>
         <div class="progress-bar-wrap">
-          <div id="scanProgressFill" class="progress-bar-fill"></div>
+          <div id="scanProgressFill" class="progress-bar-fill" :style="`width: ${scanPercent}%;`"></div>
         </div>
-        <div id="scanCountsLabel" style="font-size: 0.78rem; color: var(--text-dim);"></div>
+        <div id="scanCountsLabel" style="font-size: 0.78rem; color: var(--text-dim);" x-text="`File ${scan.fileIndex} of ${scan.totalFiles} (${scanPercent}%)`"></div>
       </div>
 
       <!-- Configured Media Sources -->
@@ -599,26 +601,67 @@ public static class DashboardPage
             <div class="card-desc">Folders and network shares scanned for intro &amp; credit detection</div>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button id="syncKodiSourcesBtn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 14px;" title="Fetch latest sources from Kodi">🔄 Sync from Kodi</button>
-            <button id="scanAllSourcesBtn" class="btn btn-primary" style="font-size: 0.85rem; padding: 6px 14px;">▶ Scan All Enabled</button>
+            <button id="syncKodiSourcesBtn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 14px;" title="Fetch latest sources from Kodi" :disabled="syncingKodi" @click="syncKodiSources()" x-text="syncingKodi ? '🔄 Syncing...' : '🔄 Sync from Kodi'">🔄 Sync from Kodi</button>
+            <button id="scanAllSourcesBtn" class="btn btn-primary" style="font-size: 0.85rem; padding: 6px 14px;" @click="scanAllSources()">▶ Scan All Enabled</button>
           </div>
         </div>
         
         <div id="sourcesList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
-          <div style="color: var(--text-muted); font-size: 0.85rem;">Loading sources...</div>
+          <!-- Warning banner if any non-tv sources enabled -->
+          <div x-show="hasNonTvEnabledSources" x-transition style="padding: 10px 14px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: var(--radius-sm); color: #fbbf24; font-size: 0.82rem; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 10px;">
+            <span style="font-size: 1.1rem; line-height: 1;">⚠️</span>
+            <div>
+              <strong>Warning:</strong> One or more enabled sources are not set to <strong>TV Shows</strong> in Kodi. IntroSkipper is designed for television series; scanning movie or other non-episodic sources will not detect intro sequences.
+            </div>
+          </div>
+
+          <template x-if="sources.length === 0">
+            <div style="color: var(--text-dim); font-size: 0.85rem; padding: 8px 0;">No media sources configured yet. Add a directory or network share below.</div>
+          </template>
+
+          <template x-for="src in sources" :key="src.path">
+            <div :style="(() => {
+              const isTv = (src.contentType || 'tvshows').toLowerCase() === 'tvshows';
+              const opacity = isTv ? '1' : (src.enabled ? '0.75' : '0.45');
+              const filter = isTv ? 'none' : 'grayscale(0.4)';
+              const border = (!isTv && src.enabled) ? 'border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.04);' : 'border: 1px solid var(--border); background: rgba(255, 255, 255, 0.03);';
+              return `display: flex; flex-direction: column; padding: 10px 14px; border-radius: var(--radius-sm); opacity: ${opacity}; filter: ${filter}; ${border} transition: opacity 0.2s ease, border 0.2s ease;`;
+            })()">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; margin-right: 12px;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-weight: 600; font-size: 0.95rem;" x-text="src.name || 'Media Source'"></span>
+                    <span x-show="(src.contentType || 'tvshows').toLowerCase() === 'tvshows'" style="font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(99, 102, 241, 0.18); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3);">📺 TV Shows</span>
+                    <span x-show="(src.contentType || 'tvshows').toLowerCase() !== 'tvshows'" style="font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 600;" x-text="'⚠️ ' + ((src.contentType || 'unset').toLowerCase() === 'movies' ? 'Movies' : (src.contentType || 'Not Set'))"></span>
+                    <span x-show="src.isKodiSource" style="font-size: 0.72rem; padding: 2px 7px; border-radius: 9999px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">Kodi</span>
+                    <span style="font-size: 0.72rem; padding: 1px 7px; border-radius: 9999px;" :style="src.enabled ? 'background: rgba(16, 185, 129, 0.15); color: #34d399;' : 'background: rgba(156, 163, 175, 0.15); color: #9ca3af;'" x-text="src.enabled ? 'Enabled' : 'Disabled'"></span>
+                  </div>
+                  <span style="font-size: 0.82rem; color: var(--text-dim); word-break: break-all; font-family: monospace;" x-text="src.path"></span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                  <label class="switch" title="Toggle scanning for this source">
+                    <input type="checkbox" :checked="src.enabled" @click.prevent="toggleSource(src)" />
+                    <span class="slider"></span>
+                  </label>
+                  <button class="btn btn-secondary" @click="scanSingleSource(src.path)" title="Scan this source" style="padding: 5px 9px; font-size: 0.8rem;">▶</button>
+                  <button x-show="!src.isKodiSource" class="btn btn-danger" @click="removeSource(src.path)" title="Remove source" style="padding: 5px 9px; font-size: 0.8rem;">🗑</button>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
 
         <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px;">
           <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: var(--text-muted);">Add New Source Path</div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <input type="text" id="newSourceName" placeholder="Name (e.g. TV Shows)" style="max-width: 170px;" />
-            <input type="text" id="newSourcePath" placeholder="Path (e.g. /storage/tvshows or smb://server/TV)" style="max-width: none; flex: 1; min-width: 200px;" />
-            <select id="newSourceContentType" style="max-width: 130px; font-size: 0.85rem;">
+            <input type="text" id="newSourceName" x-model="newSource.name" placeholder="Name (e.g. TV Shows)" style="max-width: 170px;" />
+            <input type="text" id="newSourcePath" x-model="newSource.path" placeholder="Path (e.g. /storage/tvshows or smb://server/TV)" style="max-width: none; flex: 1; min-width: 200px;" />
+            <select id="newSourceContentType" x-model="newSource.contentType" style="max-width: 130px; font-size: 0.85rem;">
               <option value="tvshows">📺 TV Shows</option>
               <option value="movies">🎬 Movies</option>
               <option value="unset">❓ Unset</option>
             </select>
-            <button id="addSourceBtn" class="btn btn-secondary">+ Add Source</button>
+            <button id="addSourceBtn" class="btn btn-secondary" @click="addSource()">+ Add Source</button>
           </div>
         </div>
       </div>
@@ -632,11 +675,11 @@ public static class DashboardPage
           </div>
         </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
-          <input type="text" id="quickScanPath" placeholder="/storage/tvshows or smb://192.168.0.99/Media/TV" style="max-width: none; flex: 1;" />
-          <button id="quickScanBtn" class="btn btn-primary">Start Scan</button>
+          <input type="text" id="quickScanPath" x-model="quickScan.path" placeholder="/storage/tvshows or smb://192.168.0.99/Media/TV" style="max-width: none; flex: 1;" />
+          <button id="quickScanBtn" class="btn btn-primary" @click="startQuickScan()">Start Scan</button>
         </div>
         <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted);">
-          <input type="checkbox" id="quickScanEdl" id="quickScanEdl" />
+          <input type="checkbox" id="quickScanEdl" x-model="quickScan.exportEdl" />
           <label for="quickScanEdl">Export EDL (.edl) cut files alongside media for native Kodi player</label>
         </div>
       </div>
@@ -649,26 +692,26 @@ public static class DashboardPage
         <div class="setting-row">
           <div class="setting-info">
             <span class="setting-label">Segment Database</span>
-            <span id="dbPathLabel" class="setting-desc">Loading...</span>
+            <span id="dbPathLabel" class="setting-desc" x-text="status.segmentDatabasePath || 'None'">Loading...</span>
           </div>
         </div>
         <div class="setting-row">
           <div class="setting-info">
             <span class="setting-label">FFmpeg & Chromaprint</span>
-            <span id="ffmpegLabel" class="setting-desc">Loading...</span>
+            <span id="ffmpegLabel" class="setting-desc" x-text="status.fFmpegValid ? status.fFmpegVersion : 'FFmpeg invalid or missing'">Loading...</span>
           </div>
         </div>
         <div class="setting-row">
           <div class="setting-info">
             <span class="setting-label">Kodi VFS Bridge</span>
-            <span id="kodiVfsLabel" class="setting-desc">Loading...</span>
+            <span id="kodiVfsLabel" class="setting-desc" x-text="status.kodiVfsConnected ? `Connected (${status.kodiVfsUrl})` : `Offline (${status.kodiVfsUrl})`">Loading...</span>
           </div>
         </div>
       </div>
     </div>
 
     <!-- TAB: KODI & PLAYBACK -->
-    <div id="tab-kodi" class="tab-panel">
+    <div id="tab-kodi" class="tab-panel" :class="{ 'active': activeTab === 'tab-kodi' }">
       <div class="card">
         <div class="card-header">
           <div>
@@ -682,7 +725,7 @@ public static class DashboardPage
             <label for="cfg_kodiIntroAction" class="setting-label">Introduction Action</label>
             <span class="setting-desc">Action to perform when playback enters a detected intro sequence.</span>
           </div>
-          <select id="cfg_kodiIntroAction">
+          <select id="cfg_kodiIntroAction" x-model="config.kodiIntroAction">
             <option value="prompt">Show On-Screen Skip Button</option>
             <option value="autoskip">Automatically Skip</option>
             <option value="disabled">Disabled (Do nothing)</option>
@@ -694,7 +737,7 @@ public static class DashboardPage
             <label for="cfg_kodiCreditsAction" class="setting-label">Credits Action</label>
             <span class="setting-desc">Action to perform when playback reaches ending credits.</span>
           </div>
-          <select id="cfg_kodiCreditsAction">
+          <select id="cfg_kodiCreditsAction" x-model="config.kodiCreditsAction">
             <option value="prompt">Show On-Screen Skip / Next Button</option>
             <option value="autoskip">Automatically Skip Credits</option>
             <option value="nextEpisode">Jump to Next Episode Immediately</option>
@@ -708,7 +751,7 @@ public static class DashboardPage
             <span class="setting-desc">Seconds to display the credits skip prompt before hiding.</span>
           </div>
           <div class="input-unit">
-            <input type="number" id="cfg_kodiCreditsPromptDuration" min="3" max="60" value="10" />
+            <input type="number" id="cfg_kodiCreditsPromptDuration" x-model.number="config.kodiCreditsPromptDuration" min="3" max="60" />
             <span class="unit-tag">sec</span>
           </div>
         </div>
@@ -727,7 +770,7 @@ public static class DashboardPage
             <label for="cfg_kodiPathPrefixClient" class="setting-label">Client Path Prefix</label>
             <span class="setting-desc">Path prefix as seen by Kodi (e.g. smb://192.168.0.100/Media/ or /storage/recordings/)</span>
           </div>
-          <input type="text" id="cfg_kodiPathPrefixClient" placeholder="e.g. smb://192.168.0.100/Media/" style="max-width: none; flex: 1;" />
+          <input type="text" id="cfg_kodiPathPrefixClient" x-model="config.kodiPathPrefixClient" placeholder="e.g. smb://192.168.0.100/Media/" style="max-width: none; flex: 1;" />
         </div>
 
         <div class="setting-row">
@@ -735,13 +778,13 @@ public static class DashboardPage
             <label for="cfg_kodiPathPrefixServer" class="setting-label">Server Path Prefix</label>
             <span class="setting-desc">Corresponding path on the IntroSkipper server (e.g. /media/ or smb://192.168.0.100/Media/)</span>
           </div>
-          <input type="text" id="cfg_kodiPathPrefixServer" placeholder="e.g. /mnt/media/" style="max-width: none; flex: 1;" />
+          <input type="text" id="cfg_kodiPathPrefixServer" x-model="config.kodiPathPrefixServer" placeholder="e.g. /mnt/media/" style="max-width: none; flex: 1;" />
         </div>
       </div>
     </div>
 
     <!-- TAB 2: GENERAL -->
-    <div id="tab-general" class="tab-panel">
+    <div id="tab-general" class="tab-panel" :class="{ 'active': activeTab === 'tab-general' }">
       <div class="card">
         <div class="card-header">
           <div>
@@ -755,7 +798,7 @@ public static class DashboardPage
             <span class="setting-desc">Automatically analyze newly indexed media files for skippable segments.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_autoDetectIntros" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_autoDetectIntros" x-model="config.autoDetectIntros" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -764,7 +807,7 @@ public static class DashboardPage
             <span class="setting-desc">Identify and analyze episodes placed in Specials / Season 0 folders.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_analyzeSeasonZero" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_analyzeSeasonZero" x-model="config.analyzeSeasonZero" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -773,7 +816,7 @@ public static class DashboardPage
             <span class="setting-desc">Recompute segments against complete season fingerprints once no new episodes are added for the configured delay.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_reanalyzeSettledSeasons" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_reanalyzeSettledSeasons" x-model="config.reanalyzeSettledSeasons" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -783,7 +826,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_settledSeasonDelayHours" min="0" max="8760" />
+              <input type="number" id="cfg_settledSeasonDelayHours" x-model.number="config.settledSeasonDelayHours" min="0" max="8760" />
               <span class="unit-tag">hrs</span>
             </div>
           </div>
@@ -794,7 +837,7 @@ public static class DashboardPage
             <span class="setting-desc">Require local consensus groups of episodes to confirm shared intro/credit patterns.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_useSettledSeasonChromaprintConsensus" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_useSettledSeasonChromaprintConsensus" x-model="config.useSettledSeasonChromaprintConsensus" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -804,7 +847,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_settledSeasonChromaprintConsensusEpisodes" min="2" max="1000" />
+              <input type="number" id="cfg_settledSeasonChromaprintConsensusEpisodes" x-model.number="config.settledSeasonChromaprintConsensusEpisodes" min="2" max="1000" />
               <span class="unit-tag">eps</span>
             </div>
           </div>
@@ -816,7 +859,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_maxParallelism" min="1" max="16" />
+              <input type="number" id="cfg_maxParallelism" x-model.number="config.maxParallelism" min="1" max="16" />
               <span class="unit-tag">tasks</span>
             </div>
           </div>
@@ -832,23 +875,23 @@ public static class DashboardPage
         </div>
         <div class="setting-row">
           <div class="setting-info"><span class="setting-label">Introductions</span><span class="setting-desc">Opening title and theme sequences</span></div>
-          <div class="setting-ctrl"><label class="switch"><input type="checkbox" id="cfg_scanIntroduction" /><span class="slider"></span></label></div>
+          <div class="setting-ctrl"><label class="switch"><input type="checkbox" id="cfg_scanIntroduction" x-model="config.scanIntroduction" /><span class="slider"></span></label></div>
         </div>
         <div class="setting-row">
           <div class="setting-info"><span class="setting-label">Credits</span><span class="setting-desc">Ending credits rolls and title cards</span></div>
-          <div class="setting-ctrl"><label class="switch"><input type="checkbox" id="cfg_scanCredits" /><span class="slider"></span></label></div>
+          <div class="setting-ctrl"><label class="switch"><input type="checkbox" id="cfg_scanCredits" x-model="config.scanCredits" /><span class="slider"></span></label></div>
         </div>
         <div class="setting-row">
           <div class="setting-info"><span class="setting-label">Recaps</span><span class="setting-desc">"Previously on..." recap sequences</span></div>
-          <div class="setting-ctrl"><label class="switch"><input type="checkbox" id="cfg_scanRecap" /><span class="slider"></span></label></div>
+          <div class="setting-ctrl"><label class="switch"><input type="checkbox" id="cfg_scanRecap" x-model="config.scanRecap" /><span class="slider"></span></label></div>
         </div>
         <div class="setting-row">
           <div class="setting-info"><span class="setting-label">Previews</span><span class="setting-desc">"Next time on..." teaser / preview sequences</span></div>
-          <div class="setting-ctrl"><label class="switch"><input type="checkbox" id="cfg_scanPreview" /><span class="slider"></span></label></div>
+          <div class="setting-ctrl"><label class="switch"><input type="checkbox" id="cfg_scanPreview" x-model="config.scanPreview" /><span class="slider"></span></label></div>
         </div>
         <div class="setting-row">
           <div class="setting-info"><span class="setting-label">Commercials</span><span class="setting-desc">Commercial breaks and interstitial segments</span></div>
-          <div class="setting-ctrl"><label class="switch"><input type="checkbox" id="cfg_scanCommercial" /><span class="slider"></span></label></div>
+          <div class="setting-ctrl"><label class="switch"><input type="checkbox" id="cfg_scanCommercial" x-model="config.scanCommercial" /><span class="slider"></span></label></div>
         </div>
       </div>
 
@@ -863,10 +906,17 @@ public static class DashboardPage
           <div class="setting-info">
             <span class="setting-label">Excluded Series</span>
             <span class="setting-desc">Series titles to skip during scanning (case-insensitive). Type name and press Enter.</span>
-            <div id="seriesTags" class="tag-container" style="margin-top: 8px;"></div>
+            <div id="seriesTags" class="tag-container" style="margin-top: 8px;">
+              <template x-for="(item, idx) in (config.seriesExclusions || [])" :key="idx">
+                <span class="tag">
+                  <span x-text="item"></span>
+                  <span class="tag-remove" @click="removeSeriesExclusion(idx)">×</span>
+                </span>
+              </template>
+            </div>
             <div style="display: flex; gap: 6px; max-width: 350px;">
-              <input type="text" id="addSeriesInput" placeholder="Add series name..." />
-              <button id="addSeriesBtn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem;">Add</button>
+              <input type="text" id="addSeriesInput" x-model="newSeriesExclusion" @keydown.enter.prevent="addSeriesExclusion()" placeholder="Add series name..." />
+              <button id="addSeriesBtn" type="button" @click="addSeriesExclusion()" class="btn btn-secondary" style="padding: 0.4rem 0.8rem;">Add</button>
             </div>
           </div>
         </div>
@@ -874,10 +924,17 @@ public static class DashboardPage
           <div class="setting-info">
             <span class="setting-label">Excluded Paths</span>
             <span class="setting-desc">Directories or network shares to ignore. Type path and press Enter.</span>
-            <div id="pathTags" class="tag-container" style="margin-top: 8px;"></div>
+            <div id="pathTags" class="tag-container" style="margin-top: 8px;">
+              <template x-for="(item, idx) in (config.pathExclusions || [])" :key="idx">
+                <span class="tag">
+                  <span x-text="item"></span>
+                  <span class="tag-remove" @click="removePathExclusion(idx)">×</span>
+                </span>
+              </template>
+            </div>
             <div style="display: flex; gap: 6px; max-width: 350px;">
-              <input type="text" id="addPathInput" placeholder="/path/to/ignore or smb://..." />
-              <button id="addPathBtn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem;">Add</button>
+              <input type="text" id="addPathInput" x-model="newPathExclusion" @keydown.enter.prevent="addPathExclusion()" placeholder="/path/to/ignore or smb://..." />
+              <button id="addPathBtn" type="button" @click="addPathExclusion()" class="btn btn-secondary" style="padding: 0.4rem 0.8rem;">Add</button>
             </div>
           </div>
         </div>
@@ -885,7 +942,7 @@ public static class DashboardPage
     </div>
 
     <!-- TAB 3: AUDIO & FINGERPRINT -->
-    <div id="tab-audio" class="tab-panel">
+    <div id="tab-audio" class="tab-panel" :class="{ 'active': activeTab === 'tab-audio' }">
       <div class="card">
         <div class="card-header">
           <div>
@@ -900,8 +957,8 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="range-box">
-              <input type="range" id="cfg_analysisPercent" min="1" max="50" step="1" />
-              <span id="analysisPercentVal" class="range-val">25%</span>
+              <input type="range" id="cfg_analysisPercent" min="1" max="50" step="1" x-model.number="config.analysisPercent" />
+              <span id="analysisPercentVal" class="range-val" x-text="`${config.analysisPercent || 25}%`">25%</span>
             </div>
           </div>
         </div>
@@ -912,7 +969,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_analysisLengthLimit" min="1" max="60" />
+              <input type="number" id="cfg_analysisLengthLimit" min="1" max="60" x-model.number="config.analysisLengthLimit" />
               <span class="unit-tag">min</span>
             </div>
           </div>
@@ -923,7 +980,7 @@ public static class DashboardPage
             <span class="setting-desc">How to handle the first episode of a season (pilot episodes often lack standard theme songs).</span>
           </div>
           <div class="setting-ctrl">
-            <select id="cfg_firstEpisodeIntroMode">
+            <select id="cfg_firstEpisodeIntroMode" x-model="config.firstEpisodeIntroMode">
               <option value="Analyze">Analyze Normally</option>
               <option value="Ignore">Ignore First Episode</option>
               <option value="IgnoreAnime">Ignore First Episode for Anime</option>
@@ -936,7 +993,7 @@ public static class DashboardPage
             <span class="setting-desc">Run Chromaprint ahead of embedded chapter marks for intros and recaps.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_preferChromaprint" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_preferChromaprint" x-model="config.preferChromaprint" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -945,7 +1002,7 @@ public static class DashboardPage
             <span class="setting-desc">Directly probe the audio stream duration to avoid inflated timestamps caused by subtitle streams.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_probeAudioDuration" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_probeAudioDuration" x-model="config.probeAudioDuration" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -954,7 +1011,7 @@ public static class DashboardPage
             <span class="setting-desc">Language tag (e.g. jpn, eng, ger) to select for fingerprinting when multiple audio streams exist.</span>
           </div>
           <div class="setting-ctrl">
-            <input type="text" id="cfg_preferredAudioLanguage" placeholder="e.g. jpn, eng" />
+            <input type="text" id="cfg_preferredAudioLanguage" placeholder="e.g. jpn, eng" x-model="config.preferredAudioLanguage" />
           </div>
         </div>
         <div class="setting-row">
@@ -963,14 +1020,14 @@ public static class DashboardPage
             <span class="setting-desc">Use standard FFmpeg default-disposition or highest channel count stream selection.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_preferAudioStreamWithMostChannels" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_preferAudioStreamWithMostChannels" x-model="config.preferAudioStreamWithMostChannels" /><span class="slider"></span></label>
           </div>
         </div>
       </div>
     </div>
 
     <!-- TAB 4: DETECTION RULES -->
-    <div id="tab-detection" class="tab-panel">
+    <div id="tab-detection" class="tab-panel" :class="{ 'active': activeTab === 'tab-detection' }">
       <div class="card">
         <div class="card-header">
           <div>
@@ -985,7 +1042,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_minimumIntroDuration" min="1" max="600" />
+              <input type="number" id="cfg_minimumIntroDuration" min="1" max="600" x-model.number="config.minimumIntroDuration" />
               <span class="unit-tag">sec</span>
             </div>
           </div>
@@ -997,7 +1054,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_maximumIntroDuration" min="10" max="600" />
+              <input type="number" id="cfg_maximumIntroDuration" min="10" max="600" x-model.number="config.maximumIntroDuration" />
               <span class="unit-tag">sec</span>
             </div>
           </div>
@@ -1018,7 +1075,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_minimumCreditsDuration" min="1" max="600" />
+              <input type="number" id="cfg_minimumCreditsDuration" min="1" max="600" x-model.number="config.minimumCreditsDuration" />
               <span class="unit-tag">sec</span>
             </div>
           </div>
@@ -1030,7 +1087,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_maximumCreditsDuration" min="10" max="1800" />
+              <input type="number" id="cfg_maximumCreditsDuration" min="10" max="1800" x-model.number="config.maximumCreditsDuration" />
               <span class="unit-tag">sec</span>
             </div>
           </div>
@@ -1041,7 +1098,7 @@ public static class DashboardPage
             <span class="setting-desc">Decode frames between keyframes to pinpoint exact frame cut to credits.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_refineCreditsBoundary" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_refineCreditsBoundary" x-model="config.refineCreditsBoundary" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -1050,7 +1107,7 @@ public static class DashboardPage
             <span class="setting-desc">Detect text on uniform grey, white, or muted colour cards from keyframe scan.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_detectNonBlackCredits" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_detectNonBlackCredits" x-model="config.detectNonBlackCredits" /><span class="slider"></span></label>
           </div>
         </div>
       </div>
@@ -1069,7 +1126,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_minimumRecapDuration" min="1" max="600" />
+              <input type="number" id="cfg_minimumRecapDuration" min="1" max="600" x-model.number="config.minimumRecapDuration" />
               <span class="unit-tag">sec</span>
             </div>
           </div>
@@ -1081,7 +1138,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_maximumRecapDuration" min="10" max="600" />
+              <input type="number" id="cfg_maximumRecapDuration" min="10" max="600" x-model.number="config.maximumRecapDuration" />
               <span class="unit-tag">sec</span>
             </div>
           </div>
@@ -1092,7 +1149,7 @@ public static class DashboardPage
             <span class="setting-desc">Automatically mark content between ending credits and file end as Preview for anime.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_animePreviewFromCreditsEnd" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_animePreviewFromCreditsEnd" x-model="config.animePreviewFromCreditsEnd" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -1101,7 +1158,7 @@ public static class DashboardPage
             <span class="setting-desc">Detect recaps from text subtitle cues matching recap phrases.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_enableSubtitleRecapDetection" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_enableSubtitleRecapDetection" x-model="config.enableSubtitleRecapDetection" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -1110,14 +1167,14 @@ public static class DashboardPage
             <span class="setting-desc">Detect previews from text subtitle cues matching preview phrases.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_enableSubtitlePreviewDetection" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_enableSubtitlePreviewDetection" x-model="config.enableSubtitlePreviewDetection" /><span class="slider"></span></label>
           </div>
         </div>
       </div>
     </div>
 
     <!-- TAB 5: CHAPTERS & PATTERNS -->
-    <div id="tab-chapters" class="tab-panel">
+    <div id="tab-chapters" class="tab-panel" :class="{ 'active': activeTab === 'tab-chapters' }">
       <div class="card">
         <div class="card-header">
           <div>
@@ -1131,7 +1188,7 @@ public static class DashboardPage
             <span class="setting-desc">Do not enforce minimum or maximum duration limits on matched chapter markers.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_fullLengthChapters" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_fullLengthChapters" x-model="config.fullLengthChapters" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -1140,7 +1197,7 @@ public static class DashboardPage
             <span class="setting-desc">Detect known SponsorBlock chapter names in addition to regular expressions.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_enableSponsorBlockChapterDetection" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_enableSponsorBlockChapterDetection" x-model="config.enableSponsorBlockChapterDetection" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -1149,7 +1206,7 @@ public static class DashboardPage
             <span class="setting-desc">Always read chapters directly embedded in the media file via ffprobe.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_useEmbeddedChaptersForAnalysis" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_useEmbeddedChaptersForAnalysis" x-model="config.useEmbeddedChaptersForAnalysis" /><span class="slider"></span></label>
           </div>
         </div>
       </div>
@@ -1167,7 +1224,7 @@ public static class DashboardPage
             <span class="setting-desc">Regex matched for opening titles and themes.</span>
           </div>
           <div class="setting-ctrl" style="min-width: 320px;">
-            <input type="text" id="cfg_chapterAnalyzerIntroductionPattern" style="max-width: none;" />
+            <input type="text" id="cfg_chapterAnalyzerIntroductionPattern" style="max-width: none;" x-model="config.chapterAnalyzerIntroductionPattern" />
           </div>
         </div>
         <div class="setting-row">
@@ -1176,7 +1233,7 @@ public static class DashboardPage
             <span class="setting-desc">Regex matched for ending credits chapters.</span>
           </div>
           <div class="setting-ctrl" style="min-width: 320px;">
-            <input type="text" id="cfg_chapterAnalyzerEndCreditsPattern" style="max-width: none;" />
+            <input type="text" id="cfg_chapterAnalyzerEndCreditsPattern" style="max-width: none;" x-model="config.chapterAnalyzerEndCreditsPattern" />
           </div>
         </div>
         <div class="setting-row">
@@ -1185,7 +1242,7 @@ public static class DashboardPage
             <span class="setting-desc">Regex matched for recap chapters.</span>
           </div>
           <div class="setting-ctrl" style="min-width: 320px;">
-            <input type="text" id="cfg_chapterAnalyzerRecapPattern" style="max-width: none;" />
+            <input type="text" id="cfg_chapterAnalyzerRecapPattern" style="max-width: none;" x-model="config.chapterAnalyzerRecapPattern" />
           </div>
         </div>
         <div class="setting-row">
@@ -1194,7 +1251,7 @@ public static class DashboardPage
             <span class="setting-desc">Regex matched for preview / teaser chapters.</span>
           </div>
           <div class="setting-ctrl" style="min-width: 320px;">
-            <input type="text" id="cfg_chapterAnalyzerPreviewPattern" style="max-width: none;" />
+            <input type="text" id="cfg_chapterAnalyzerPreviewPattern" style="max-width: none;" x-model="config.chapterAnalyzerPreviewPattern" />
           </div>
         </div>
         <div class="setting-row">
@@ -1203,14 +1260,14 @@ public static class DashboardPage
             <span class="setting-desc">Regex matched for commercial break chapters.</span>
           </div>
           <div class="setting-ctrl" style="min-width: 320px;">
-            <input type="text" id="cfg_chapterAnalyzerCommercialPattern" style="max-width: none;" />
+            <input type="text" id="cfg_chapterAnalyzerCommercialPattern" style="max-width: none;" x-model="config.chapterAnalyzerCommercialPattern" />
           </div>
         </div>
       </div>
     </div>
 
     <!-- TAB 6: VISUALS & BLACK FRAMES -->
-    <div id="tab-visuals" class="tab-panel">
+    <div id="tab-visuals" class="tab-panel" :class="{ 'active': activeTab === 'tab-visuals' }">
       <div class="card">
         <div class="card-header">
           <div>
@@ -1224,7 +1281,7 @@ public static class DashboardPage
             <span class="setting-desc">Fallback to legacy analyzer for systems where keyframe analyzer is unsupported.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_useLegacyBlackFrameAnalyzer" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_useLegacyBlackFrameAnalyzer" x-model="config.useLegacyBlackFrameAnalyzer" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -1234,7 +1291,7 @@ public static class DashboardPage
           </div>
           <div class="setting-ctrl">
             <div class="input-unit">
-              <input type="number" id="cfg_blackFrameMinimumPercentage" min="50" max="100" />
+              <input type="number" id="cfg_blackFrameMinimumPercentage" min="50" max="100" x-model.number="config.blackFrameMinimumPercentage" />
               <span class="unit-tag">%</span>
             </div>
           </div>
@@ -1245,7 +1302,7 @@ public static class DashboardPage
             <span class="setting-desc">Luminance threshold (0-255) below which a pixel is considered black (default: 28).</span>
           </div>
           <div class="setting-ctrl">
-            <input type="number" id="cfg_blackFrameThreshold" min="1" max="100" />
+            <input type="number" id="cfg_blackFrameThreshold" min="1" max="100" x-model.number="config.blackFrameThreshold" />
           </div>
         </div>
         <div class="setting-row">
@@ -1254,7 +1311,7 @@ public static class DashboardPage
             <span class="setting-desc">Snap intro and credits boundaries to audio silence points.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_adjustIntroBasedOnSilence" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_adjustIntroBasedOnSilence" x-model="config.adjustIntroBasedOnSilence" /><span class="slider"></span></label>
           </div>
         </div>
         <div class="setting-row">
@@ -1263,7 +1320,7 @@ public static class DashboardPage
             <span class="setting-desc">Align cut boundaries to nearest video keyframe for seamless visual skipping.</span>
           </div>
           <div class="setting-ctrl">
-            <label class="switch"><input type="checkbox" id="cfg_snapToKeyframe" /><span class="slider"></span></label>
+            <label class="switch"><input type="checkbox" id="cfg_snapToKeyframe" x-model="config.snapToKeyframe" /><span class="slider"></span></label>
           </div>
         </div>
       </div>
@@ -1271,32 +1328,37 @@ public static class DashboardPage
   </main>
 
   <!-- Floating Save Bar -->
-  <div id="saveBar" class="save-bar">
+  <div id="saveBar" class="save-bar" :class="{ 'visible': isDirty }" x-show="isDirty" x-cloak x-transition>
     <div class="save-bar-text">
       <span>●</span>
       <span>You have unsaved changes</span>
     </div>
     <div style="display: flex; gap: 8px;">
-      <button id="discardChangesBtn" class="btn btn-secondary">Discard</button>
-      <button id="saveChangesBtn" class="btn btn-primary">Save Changes</button>
+      <button id="discardChangesBtn" class="btn btn-secondary" @click="discardChanges()">Discard</button>
+      <button id="saveChangesBtn" class="btn btn-primary" @click="saveConfig()">Save Changes</button>
     </div>
   </div>
 
   <!-- Toast Notification -->
-  <div id="toast" class="toast">
-    <span id="toastIcon">✔</span>
-    <span id="toastMsg">Notification</span>
+  <div id="toast" class="toast" :class="{ 'show': toast.show, 'success': toast.isSuccess, 'error': !toast.isSuccess }" x-show="toast.show" x-cloak x-transition>
+    <span id="toastIcon" x-text="toast.isSuccess ? '✔' : '✖'">✔</span>
+    <span id="toastMsg" x-text="toast.message">Notification</span>
   </div>
 
   <!-- Confirm Enable Non-TV Source Modal -->
-  <div id="confirmSourceModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
-    <div style="background: #18181b; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: var(--radius-md); max-width: 460px; width: 100%; padding: 22px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6); animation: modalFadeIn 0.15s ease-out;">
+  <div id="confirmSourceModal"
+       x-show="confirmModal.open"
+       x-cloak
+       x-transition.opacity
+       @keydown.escape.window="confirmModal.open = false"
+       style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;">
+    <div @click.outside="confirmModal.open = false" style="background: #18181b; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: var(--radius-md); max-width: 460px; width: 100%; padding: 22px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6); animation: modalFadeIn 0.15s ease-out;">
       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
         <span style="font-size: 1.5rem; line-height: 1;">⚠️</span>
         <h3 style="font-size: 1.05rem; font-weight: 700; color: #fbbf24; margin: 0;">Enable Non-TV Show Source?</h3>
       </div>
       <p style="font-size: 0.88rem; color: var(--text-main); line-height: 1.5; margin-bottom: 12px;">
-        The source <strong id="confirmModalSourceName" style="color: #fff;"></strong> is configured as <span id="confirmModalContentType" style="display: inline-block; font-size: 0.75rem; padding: 1px 7px; border-radius: 9999px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 600;"></span> in Kodi.
+        The source <strong id="confirmModalSourceName" style="color: #fff;" x-text="confirmModal.source ? (confirmModal.source.name || confirmModal.source.path) : 'Media Source'"></strong> is configured as <span id="confirmModalContentType" style="display: inline-block; font-size: 0.75rem; padding: 1px 7px; border-radius: 9999px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 600;" x-text="(confirmModal.source?.contentType || 'unset').toLowerCase() === 'movies' ? 'Movies' : (confirmModal.source?.contentType || 'Not Set')"></span> in Kodi.
       </p>
       <div style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b; padding: 10px 12px; border-radius: 4px; font-size: 0.82rem; color: #fbbf24; line-height: 1.45; margin-bottom: 18px;">
         Intro and credit detection requires episodic television series. Scanning movies or non-episodic media will not detect intro sequences and will waste analysis time.
@@ -1305,598 +1367,368 @@ public static class DashboardPage
         Are you really sure you want to enable automatic scanning for this source?
       </p>
       <div style="display: flex; justify-content: flex-end; gap: 10px;">
-        <button id="confirmModalCancelBtn" class="btn btn-secondary" style="padding: 7px 16px;">Cancel</button>
-        <button id="confirmModalOkBtn" class="btn btn-primary" style="background: #f59e0b; border-color: #d97706; color: #000; font-weight: 600; padding: 7px 16px;">Enable Anyway</button>
+        <button id="confirmModalCancelBtn" class="btn btn-secondary" style="padding: 7px 16px;" @click="confirmModal.open = false">Cancel</button>
+        <button id="confirmModalOkBtn" class="btn btn-primary" style="background: #f59e0b; border-color: #d97706; color: #000; font-weight: 600; padding: 7px 16px;" @click="confirmEnableSource()">Enable Anyway</button>
       </div>
     </div>
   </div>
 
   <script>
-    let activeConfig = {};
-    let isDirty = false;
-    let scanPollTimer = null;
+    function dashboardApp() {
+      return {
+        activeTab: 'tab-overview',
+        config: {
+          autoDetectIntros: true,
+          analyzeSeasonZero: true,
+          reanalyzeSettledSeasons: true,
+          settledSeasonDelayHours: 48,
+          useSettledSeasonChromaprintConsensus: true,
+          settledSeasonChromaprintConsensusEpisodes: 8,
+          maxParallelism: 2,
+          scanIntroduction: true,
+          scanCredits: true,
+          scanRecap: true,
+          scanPreview: true,
+          scanCommercial: false,
+          seriesExclusions: [],
+          pathExclusions: [],
+          analysisPercent: 25,
+          analysisLengthLimit: 10,
+          firstEpisodeIntroMode: 'Analyze',
+          preferChromaprint: true,
+          probeAudioDuration: true,
+          preferredAudioLanguage: '',
+          preferAudioStreamWithMostChannels: false,
+          minimumIntroDuration: 15,
+          maximumIntroDuration: 120,
+          minimumCreditsDuration: 20,
+          maximumCreditsDuration: 300,
+          refineCreditsBoundary: true,
+          detectNonBlackCredits: false,
+          minimumRecapDuration: 10,
+          maximumRecapDuration: 120,
+          animePreviewFromCreditsEnd: false,
+          enableSubtitleRecapDetection: false,
+          enableSubtitlePreviewDetection: false,
+          fullLengthChapters: false,
+          enableSponsorBlockChapterDetection: false,
+          useEmbeddedChaptersForAnalysis: false,
+          chapterAnalyzerIntroductionPattern: '',
+          chapterAnalyzerEndCreditsPattern: '',
+          chapterAnalyzerRecapPattern: '',
+          chapterAnalyzerPreviewPattern: '',
+          chapterAnalyzerCommercialPattern: '',
+          useLegacyBlackFrameAnalyzer: false,
+          blackFrameMinimumPercentage: 95,
+          blackFrameThreshold: 28,
+          adjustIntroBasedOnSilence: false,
+          snapToKeyframe: false,
+          kodiIntroAction: 'prompt',
+          kodiCreditsAction: 'prompt',
+          kodiCreditsPromptDuration: 10,
+          kodiPathPrefixClient: '',
+          kodiPathPrefixServer: ''
+        },
+        savedConfigJson: '',
+        newSeriesExclusion: '',
+        newPathExclusion: '',
+        sources: [],
+        newSource: { name: '', path: '', contentType: 'tvshows' },
+        syncingKodi: false,
+        quickScan: { path: '', exportEdl: false },
+        toast: { show: false, message: '', isSuccess: true, timer: null },
+        confirmModal: { open: false, source: null },
+        status: {
+          status: 'Online',
+          isScanning: false,
+          segmentDatabasePath: 'None',
+          fFmpegValid: false,
+          fFmpegVersion: 'FFmpeg invalid or missing',
+          kodiVfsConnected: false,
+          kodiVfsUrl: ''
+        },
+        stats: {
+          totalSeries: 0,
+          totalEpisodes: 0,
+          totalSegments: 0,
+          introCount: 0,
+          creditsCount: 0,
+          formattedSkippedTime: '0h 0m'
+        },
+        scan: {
+          isScanning: false,
+          currentStage: 'Processing...',
+          currentFile: '',
+          fileIndex: 0,
+          totalFiles: 0
+        },
 
-    // Elements
-    const saveBar = document.getElementById('saveBar');
-    const toast = document.getElementById('toast');
-    const toastMsg = document.getElementById('toastMsg');
-    const toastIcon = document.getElementById('toastIcon');
+        get isDirty() {
+          if (!this.savedConfigJson) return false;
+          return JSON.stringify(this.config) !== this.savedConfigJson;
+        },
 
-    function showToast(msg, isSuccess = true) {
-      toast.className = 'toast ' + (isSuccess ? 'success' : 'error') + ' show';
-      toastMsg.textContent = msg;
-      toastIcon.textContent = isSuccess ? '✔' : '✖';
-      setTimeout(() => { toast.classList.remove('show'); }, 3500);
-    }
+        get scanPercent() {
+          if (!this.scan || this.scan.totalFiles <= 0) return 0;
+          return Math.round((this.scan.fileIndex / this.scan.totalFiles) * 100);
+        },
 
-    function markDirty() {
-      if (!isDirty) {
-        isDirty = true;
-        saveBar.classList.add('visible');
-      }
-    }
+        get hasNonTvEnabledSources() {
+          return this.sources.some(s => (s.contentType || 'tvshows').toLowerCase() !== 'tvshows' && s.enabled);
+        },
 
-    function clearDirty() {
-      isDirty = false;
-      saveBar.classList.remove('visible');
-    }
+        get statusBadgeClass() {
+          if (this.status.status === 'Disconnected') return 'status-badge offline';
+          if (this.status.isScanning) return 'status-badge scanning';
+          return 'status-badge';
+        },
 
-    // Tab Navigation
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.tab).classList.add('active');
-      });
-    });
+        get statusBadgeText() {
+          if (this.status.status === 'Disconnected') return 'Disconnected';
+          if (this.status.isScanning) return 'Scanning Library';
+          return this.status.status || 'Online';
+        },
 
-    // Range slider live feedback
-    const rangeSlider = document.getElementById('cfg_analysisPercent');
-    const rangeVal = document.getElementById('analysisPercentVal');
-    rangeSlider.addEventListener('input', () => {
-      rangeVal.textContent = rangeSlider.value + '%';
-      markDirty();
-    });
+        init() {
+          this.loadConfig();
+          this.loadSources();
+          this.updateStatus();
+          setInterval(() => this.updateStatus(), 3000);
+        },
 
-    // Tag list helpers
-    function renderTags(containerId, list, onChange) {
-      const el = document.getElementById(containerId);
-      el.innerHTML = '';
-      list.forEach((item, idx) => {
-        const tag = document.createElement('span');
-        tag.className = 'tag';
-        tag.innerHTML = `${item} <span class="tag-remove" data-idx="${idx}">×</span>`;
-        tag.querySelector('.tag-remove').addEventListener('click', () => {
-          list.splice(idx, 1);
-          renderTags(containerId, list, onChange);
-          onChange();
-        });
-        el.appendChild(tag);
-      });
-    }
+        showToast(message, isSuccess = true) {
+          if (this.toast.timer) clearTimeout(this.toast.timer);
+          this.toast.message = message;
+          this.toast.isSuccess = isSuccess;
+          this.toast.show = true;
+          this.toast.timer = setTimeout(() => {
+            this.toast.show = false;
+          }, 3500);
+        },
 
-    let seriesExclusions = [];
-    let pathExclusions = [];
-
-    document.getElementById('addSeriesBtn').addEventListener('click', () => {
-      const inp = document.getElementById('addSeriesInput');
-      const val = inp.value.trim();
-      if (val && !seriesExclusions.includes(val)) {
-        seriesExclusions.push(val);
-        inp.value = '';
-        renderTags('seriesTags', seriesExclusions, markDirty);
-        markDirty();
-      }
-    });
-    document.getElementById('addSeriesInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addSeriesBtn').click(); }
-    });
-
-    document.getElementById('addPathBtn').addEventListener('click', () => {
-      const inp = document.getElementById('addPathInput');
-      const val = inp.value.trim();
-      if (val && !pathExclusions.includes(val)) {
-        pathExclusions.push(val);
-        inp.value = '';
-        renderTags('pathTags', pathExclusions, markDirty);
-        markDirty();
-      }
-    });
-    document.getElementById('addPathInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addPathBtn').click(); }
-    });
-
-    // Populate inputs from config object
-    function populateForm(cfg) {
-      activeConfig = JSON.parse(JSON.stringify(cfg));
-      clearDirty();
-
-      // Checkboxes
-      const boolKeys = [
-        'autoDetectIntros', 'analyzeSeasonZero', 'reanalyzeSettledSeasons',
-        'useSettledSeasonChromaprintConsensus', 'scanIntroduction', 'scanCredits',
-        'scanRecap', 'scanPreview', 'scanCommercial', 'preferChromaprint',
-        'probeAudioDuration', 'preferAudioStreamWithMostChannels',
-        'refineCreditsBoundary', 'detectNonBlackCredits', 'animePreviewFromCreditsEnd',
-        'enableSubtitleRecapDetection', 'enableSubtitlePreviewDetection',
-        'fullLengthChapters', 'enableSponsorBlockChapterDetection',
-        'useEmbeddedChaptersForAnalysis', 'useLegacyBlackFrameAnalyzer',
-        'adjustIntroBasedOnSilence', 'snapToKeyframe'
-      ];
-      boolKeys.forEach(k => {
-        const el = document.getElementById('cfg_' + k);
-        if (el) {
-          el.checked = Boolean(cfg[k]);
-          el.onchange = markDirty;
-        }
-      });
-
-      // Numbers & Text
-      const valKeys = [
-        'settledSeasonDelayHours', 'settledSeasonChromaprintConsensusEpisodes',
-        'maxParallelism',
-        'analysisLengthLimit', 'preferredAudioLanguage', 'minimumIntroDuration',
-        'maximumIntroDuration', 'minimumCreditsDuration', 'maximumCreditsDuration',
-        'minimumRecapDuration', 'maximumRecapDuration', 'chapterAnalyzerIntroductionPattern',
-        'chapterAnalyzerEndCreditsPattern', 'chapterAnalyzerRecapPattern',
-        'chapterAnalyzerPreviewPattern', 'chapterAnalyzerCommercialPattern',
-        'blackFrameMinimumPercentage', 'blackFrameThreshold'
-      ];
-      valKeys.forEach(k => {
-        const el = document.getElementById('cfg_' + k);
-        if (el) {
-          el.value = cfg[k] ?? '';
-          el.oninput = markDirty;
-        }
-      });
-
-      // Select
-      const modeEl = document.getElementById('cfg_firstEpisodeIntroMode');
-      if (modeEl) {
-        modeEl.value = cfg.firstEpisodeIntroMode || 'Analyze';
-        modeEl.onchange = markDirty;
-      }
-
-      // Kodi Settings
-      const kodiIntroEl = document.getElementById('cfg_kodiIntroAction');
-      if (kodiIntroEl) {
-        kodiIntroEl.value = cfg.kodiIntroAction || 'prompt';
-        kodiIntroEl.onchange = markDirty;
-      }
-      const kodiCreditsEl = document.getElementById('cfg_kodiCreditsAction');
-      if (kodiCreditsEl) {
-        kodiCreditsEl.value = cfg.kodiCreditsAction || 'prompt';
-        kodiCreditsEl.onchange = markDirty;
-      }
-      const kodiDurationEl = document.getElementById('cfg_kodiCreditsPromptDuration');
-      if (kodiDurationEl) {
-        kodiDurationEl.value = cfg.kodiCreditsPromptDuration ?? 10;
-        kodiDurationEl.oninput = markDirty;
-      }
-      const kodiClientPrefixEl = document.getElementById('cfg_kodiPathPrefixClient');
-      if (kodiClientPrefixEl) {
-        kodiClientPrefixEl.value = cfg.kodiPathPrefixClient || '';
-        kodiClientPrefixEl.oninput = markDirty;
-      }
-      const kodiServerPrefixEl = document.getElementById('cfg_kodiPathPrefixServer');
-      if (kodiServerPrefixEl) {
-        kodiServerPrefixEl.value = cfg.kodiPathPrefixServer || '';
-        kodiServerPrefixEl.oninput = markDirty;
-      }
-
-      // Range
-      if (cfg.analysisPercent) {
-        rangeSlider.value = cfg.analysisPercent;
-        rangeVal.textContent = cfg.analysisPercent + '%';
-      }
-
-      // Lists
-      seriesExclusions = Array.isArray(cfg.seriesExclusions) ? [...cfg.seriesExclusions] : [];
-      renderTags('seriesTags', seriesExclusions, markDirty);
-
-      pathExclusions = Array.isArray(cfg.pathExclusions) ? [...cfg.pathExclusions] : [];
-      renderTags('pathTags', pathExclusions, markDirty);
-    }
-
-    // Collect config object from form
-    function collectForm() {
-      const cfg = { ...activeConfig };
-      const boolKeys = [
-        'autoDetectIntros', 'analyzeSeasonZero', 'reanalyzeSettledSeasons',
-        'useSettledSeasonChromaprintConsensus', 'scanIntroduction', 'scanCredits',
-        'scanRecap', 'scanPreview', 'scanCommercial', 'preferChromaprint',
-        'probeAudioDuration', 'preferAudioStreamWithMostChannels',
-        'refineCreditsBoundary', 'detectNonBlackCredits', 'animePreviewFromCreditsEnd',
-        'enableSubtitleRecapDetection', 'enableSubtitlePreviewDetection',
-        'fullLengthChapters', 'enableSponsorBlockChapterDetection',
-        'useEmbeddedChaptersForAnalysis', 'useLegacyBlackFrameAnalyzer',
-        'adjustIntroBasedOnSilence', 'snapToKeyframe'
-      ];
-      boolKeys.forEach(k => {
-        const el = document.getElementById('cfg_' + k);
-        if (el) cfg[k] = el.checked;
-      });
-
-      const numKeys = [
-        'settledSeasonDelayHours', 'settledSeasonChromaprintConsensusEpisodes',
-        'maxParallelism',
-        'analysisLengthLimit', 'minimumIntroDuration', 'maximumIntroDuration',
-        'minimumCreditsDuration', 'maximumCreditsDuration', 'minimumRecapDuration',
-        'maximumRecapDuration', 'blackFrameMinimumPercentage', 'blackFrameThreshold'
-      ];
-      numKeys.forEach(k => {
-        const el = document.getElementById('cfg_' + k);
-        if (el) {
-          const parsed = parseInt(el.value, 10);
-          cfg[k] = k === 'maxParallelism' ? Math.max(1, parsed || 2) : (parsed || 0);
-        }
-      });
-
-      const strKeys = [
-        'preferredAudioLanguage', 'chapterAnalyzerIntroductionPattern',
-        'chapterAnalyzerEndCreditsPattern', 'chapterAnalyzerRecapPattern',
-        'chapterAnalyzerPreviewPattern', 'chapterAnalyzerCommercialPattern'
-      ];
-      strKeys.forEach(k => {
-        const el = document.getElementById('cfg_' + k);
-        if (el) cfg[k] = el.value;
-      });
-
-      cfg.analysisPercent = parseInt(rangeSlider.value, 10) || 25;
-      cfg.firstEpisodeIntroMode = document.getElementById('cfg_firstEpisodeIntroMode').value;
-      cfg.seriesExclusions = [...seriesExclusions];
-      cfg.pathExclusions = [...pathExclusions];
-
-      const kIntro = document.getElementById('cfg_kodiIntroAction');
-      if (kIntro) cfg.kodiIntroAction = kIntro.value;
-      const kCredits = document.getElementById('cfg_kodiCreditsAction');
-      if (kCredits) cfg.kodiCreditsAction = kCredits.value;
-      const kDuration = document.getElementById('cfg_kodiCreditsPromptDuration');
-      if (kDuration) cfg.kodiCreditsPromptDuration = parseInt(kDuration.value, 10) || 10;
-      const kClientPrefix = document.getElementById('cfg_kodiPathPrefixClient');
-      if (kClientPrefix) cfg.kodiPathPrefixClient = kClientPrefix.value;
-      const kServerPrefix = document.getElementById('cfg_kodiPathPrefixServer');
-      if (kServerPrefix) cfg.kodiPathPrefixServer = kServerPrefix.value;
-
-      return cfg;
-    }
-
-    // Fetch config
-    async function loadConfig() {
-      try {
-        const res = await fetch('/api/config');
-        if (res.ok) {
-          const data = await res.json();
-          populateForm(data);
-        } else {
-          showToast('Failed to load configuration from server', false);
-        }
-      } catch (err) {
-        showToast('Network error loading configuration: ' + err, false);
-      }
-    }
-
-    // Save config
-    async function saveConfig() {
-      const payload = collectForm();
-      try {
-        const res = await fetch('/api/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-          const updated = await res.json();
-          populateForm(updated);
-          showToast('Configuration saved successfully!');
-        } else {
-          showToast('Failed to save configuration', false);
-        }
-      } catch (err) {
-        showToast('Error saving configuration: ' + err, false);
-      }
-    }
-
-    // Reset defaults
-    async function resetConfig() {
-      if (!confirm('Are you sure you want to reset all settings to defaults?')) return;
-      try {
-        const res = await fetch('/api/config/reset', { method: 'POST' });
-        if (res.ok) {
-          const defaults = await res.json();
-          populateForm(defaults);
-          showToast('Configuration reset to default values');
-        }
-      } catch (err) {
-        showToast('Error resetting configuration: ' + err, false);
-      }
-    }
-
-    document.getElementById('saveChangesBtn').addEventListener('click', saveConfig);
-    document.getElementById('discardChangesBtn').addEventListener('click', () => {
-      populateForm(activeConfig);
-      showToast('Changes discarded');
-    });
-    document.getElementById('resetDefaultsBtn').addEventListener('click', resetConfig);
-
-    // Fetch Stats & Server Status
-    async function updateStatus() {
-      try {
-        const statusRes = await fetch('/api/status');
-        if (statusRes.ok) {
-          const s = await statusRes.json();
-          const badge = document.getElementById('statusBadge');
-          const txt = document.getElementById('statusText');
-          if (s.isScanning) {
-            badge.className = 'status-badge scanning';
-            txt.textContent = 'Scanning Library';
-          } else {
-            badge.className = 'status-badge';
-            txt.textContent = s.status || 'Online';
-          }
-
-          document.getElementById('dbPathLabel').textContent = s.segmentDatabasePath || 'None';
-          document.getElementById('ffmpegLabel').textContent = s.fFmpegValid ? s.fFmpegVersion : 'FFmpeg invalid or missing';
-          document.getElementById('kodiVfsLabel').textContent = s.kodiVfsConnected ? `Connected (${s.kodiVfsUrl})` : `Offline (${s.kodiVfsUrl})`;
-        }
-
-        const statsRes = await fetch('/api/stats');
-        if (statsRes.ok) {
-          const st = await statsRes.json();
-          document.getElementById('kpiSeries').textContent = st.totalSeries;
-          document.getElementById('kpiEpisodes').textContent = st.totalEpisodes;
-          document.getElementById('kpiSegments').textContent = st.totalSegments;
-          document.getElementById('kpiSegmentBreakdown').textContent = `${st.introCount} Intros • ${st.creditsCount} Credits`;
-          document.getElementById('kpiTimeSaved').textContent = st.formattedSkippedTime;
-        }
-
-        const scanRes = await fetch('/api/scan/status');
-        if (scanRes.ok) {
-          const scan = await scanRes.json();
-          const card = document.getElementById('scanStatusCard');
-          if (scan.isScanning) {
-            card.style.display = 'block';
-            document.getElementById('scanStageLabel').textContent = scan.currentStage || 'Processing...';
-            document.getElementById('scanFileLabel').textContent = scan.currentFile || '';
-            const percent = scan.totalFiles > 0 ? Math.round((scan.fileIndex / scan.totalFiles) * 100) : 0;
-            document.getElementById('scanProgressFill').style.width = percent + '%';
-            document.getElementById('scanCountsLabel').textContent = `File ${scan.fileIndex} of ${scan.totalFiles} (${percent}%)`;
-          } else {
-            card.style.display = 'none';
-          }
-        }
-      } catch (err) {
-        document.getElementById('statusBadge').className = 'status-badge offline';
-        document.getElementById('statusText').textContent = 'Disconnected';
-      }
-    }
-
-    // Quick scan buttons
-    document.getElementById('quickScanBtn').addEventListener('click', async () => {
-      const path = document.getElementById('quickScanPath').value.trim();
-      if (!path) { alert('Please enter a directory or network share path.'); return; }
-      const exportEdl = document.getElementById('quickScanEdl').checked;
-      try {
-        const res = await fetch('/api/scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path, exportEdl })
-        });
-        if (res.ok) {
-          showToast('Scan enqueued successfully!');
-          document.getElementById('quickScanPath').value = '';
-          updateStatus();
-        } else {
-          showToast('Failed to start scan', false);
-        }
-      } catch (err) {
-        showToast('Error: ' + err, false);
-      }
-    });
-
-    document.getElementById('stopScanBtn').addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to stop the active scan?')) return;
-      try {
-        const res = await fetch('/api/scan/stop', { method: 'POST' });
-        if (res.ok) {
-          showToast('Scan stopped');
-          updateStatus();
-        }
-      } catch (err) {
-        showToast('Error stopping scan: ' + err, false);
-      }
-    });
-
-    // Sources Management
-    let currentSources = [];
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-    }
-
-    function escapeAttr(str) {
-      if (!str) return '';
-      return String(str).replace(/"/g, "&quot;");
-    }
-
-    async function loadSources() {
-      try {
-        const res = await fetch('/api/sources');
-        if (res.ok) {
-          currentSources = await res.json();
-          renderSources(currentSources);
-        }
-      } catch (err) {
-        console.error('Failed to load sources:', err);
-      }
-    }
-
-    function showConfirmEnableModal(src, onConfirm) {
-      const modal = document.getElementById('confirmSourceModal');
-      const nameEl = document.getElementById('confirmModalSourceName');
-      const typeEl = document.getElementById('confirmModalContentType');
-      if (!modal) {
-        if (confirm(`Warning: "${src?.name || src?.path}" is configured as "${src?.contentType}" (not TV Shows). Intro and credit detection only works for TV shows.\n\nAre you sure you want to enable this source?`)) {
-          onConfirm();
-        }
-        return;
-      }
-
-      nameEl.textContent = src ? (src.name || src.path) : 'Media Source';
-      const cType = (src?.contentType || 'unset').toLowerCase();
-      typeEl.textContent = cType === 'movies' ? 'Movies' : (src?.contentType || 'Not Set');
-      modal.style.display = 'flex';
-
-      const cancelBtn = document.getElementById('confirmModalCancelBtn');
-      const okBtn = document.getElementById('confirmModalOkBtn');
-
-      const cleanup = () => {
-        modal.style.display = 'none';
-        cancelBtn.removeEventListener('click', onCancel);
-        okBtn.removeEventListener('click', onOk);
-        modal.removeEventListener('click', onBackdrop);
-        document.removeEventListener('keydown', onKeyDown);
-      };
-
-      const onCancel = () => {
-        cleanup();
-      };
-
-      const onOk = () => {
-        cleanup();
-        onConfirm();
-      };
-
-      const onBackdrop = (e) => {
-        if (e.target === modal) cleanup();
-      };
-
-      const onKeyDown = (e) => {
-        if (e.key === 'Escape') cleanup();
-      };
-
-      cancelBtn.addEventListener('click', onCancel);
-      okBtn.addEventListener('click', onOk);
-      modal.addEventListener('click', onBackdrop);
-      document.addEventListener('keydown', onKeyDown);
-    }
-
-    function renderSources(sources) {
-      const container = document.getElementById('sourcesList');
-      if (!container) return;
-      if (!sources || sources.length === 0) {
-        container.innerHTML = '<div style="color: var(--text-dim); font-size: 0.85rem; padding: 8px 0;">No media sources configured yet. Add a directory or network share below.</div>';
-        return;
-      }
-
-      const hasNonTvEnabled = sources.some(s => (s.contentType || 'tvshows').toLowerCase() !== 'tvshows' && s.enabled);
-      let bannerHtml = '';
-      if (hasNonTvEnabled) {
-        bannerHtml = `
-          <div style="padding: 10px 14px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: var(--radius-sm); color: #fbbf24; font-size: 0.82rem; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 10px;">
-            <span style="font-size: 1.1rem; line-height: 1;">⚠️</span>
-            <div>
-              <strong>Warning:</strong> One or more enabled sources are not set to <strong>TV Shows</strong> in Kodi. IntroSkipper is designed for television series; scanning movie or other non-episodic sources will not detect intro sequences.
-            </div>
-          </div>
-        `;
-      }
-
-      const rowsHtml = sources.map(src => {
-        const cType = (src.contentType || 'tvshows').toLowerCase();
-        const isTvShow = cType === 'tvshows';
-        const typeBadge = isTvShow
-          ? '<span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(99, 102, 241, 0.18); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3);">📺 TV Shows</span>'
-          : `<span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 600;">⚠️ ${escapeHtml(cType === 'movies' ? 'Movies' : (src.contentType || 'Not Set'))}</span>`;
-
-        const rowOpacity = isTvShow ? '1' : (src.enabled ? '0.75' : '0.45');
-        const rowFilter = isTvShow ? 'none' : 'grayscale(0.4)';
-        const rowBorder = (!isTvShow && src.enabled)
-          ? 'border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.04);'
-          : 'border: 1px solid var(--border); background: rgba(255, 255, 255, 0.03);';
-
-        return `
-          <div style="display: flex; flex-direction: column; padding: 10px 14px; border-radius: var(--radius-sm); opacity: ${rowOpacity}; filter: ${rowFilter}; ${rowBorder} transition: opacity 0.2s ease, border 0.2s ease;">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-              <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; margin-right: 12px;">
-                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                  <span style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(src.name || 'Media Source')}</span>
-                  ${typeBadge}
-                  ${src.isKodiSource ? '<span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 9999px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">Kodi</span>' : ''}
-                  <span style="font-size: 0.72rem; padding: 1px 7px; border-radius: 9999px; background: ${src.enabled ? 'rgba(16, 185, 129, 0.15); color: #34d399;' : 'rgba(156, 163, 175, 0.15); color: #9ca3af;'}">${src.enabled ? 'Enabled' : 'Disabled'}</span>
-                </div>
-                <span style="font-size: 0.82rem; color: var(--text-dim); word-break: break-all; font-family: monospace;">${escapeHtml(src.path)}</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                <label class="switch" title="Toggle scanning for this source">
-                  <input type="checkbox" class="source-toggle" data-path="${escapeAttr(src.path)}" ${src.enabled ? 'checked' : ''}>
-                  <span class="slider"></span>
-                </label>
-                <button class="btn btn-secondary source-scan-btn" data-path="${escapeAttr(src.path)}" title="Scan this source" style="padding: 5px 9px; font-size: 0.8rem;">▶</button>
-                ${!src.isKodiSource ? `<button class="btn btn-danger source-del-btn" data-path="${escapeAttr(src.path)}" title="Remove source" style="padding: 5px 9px; font-size: 0.8rem;">🗑</button>` : ''}
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      container.innerHTML = bannerHtml + rowsHtml;
-
-      container.querySelectorAll('.source-toggle').forEach(el => {
-        el.addEventListener('change', async () => {
-          const path = el.dataset.path;
-          const enabled = el.checked;
-          const src = currentSources.find(s => s.path === path);
-          const isTv = (src?.contentType || 'tvshows').toLowerCase() === 'tvshows';
-
-          const applyToggle = async () => {
-            try {
-              const res = await fetch('/api/sources', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  name: src ? src.name : '',
-                  path,
-                  enabled,
-                  contentType: src ? src.contentType : 'tvshows'
-                })
-              });
-              if (res.ok) {
-                if (enabled && !isTv) {
-                  showToast(`Source enabled (Warning: Content is ${src?.contentType || 'not TV Shows'})`, false);
-                } else {
-                  showToast(`Source ${enabled ? 'enabled' : 'disabled'}`);
-                }
-                loadSources();
-              } else {
-                showToast('Failed to update source', false);
-                el.checked = !enabled;
-              }
-            } catch (e) {
-              showToast('Error: ' + e, false);
-              el.checked = !enabled;
+        async loadConfig() {
+          try {
+            const res = await fetch('/api/config');
+            if (res.ok) {
+              const data = await res.json();
+              if (!Array.isArray(data.seriesExclusions)) data.seriesExclusions = [];
+              if (!Array.isArray(data.pathExclusions)) data.pathExclusions = [];
+              this.config = Object.assign({}, this.config, data);
+              this.savedConfigJson = JSON.stringify(this.config);
+            } else {
+              this.showToast('Failed to load configuration from server', false);
             }
-          };
+          } catch (err) {
+            this.showToast('Network error loading configuration: ' + err, false);
+          }
+        },
 
-          if (enabled && !isTv) {
-            el.checked = false;
-            showConfirmEnableModal(src, () => {
-              el.checked = true;
-              applyToggle();
+        async saveConfig() {
+          try {
+            const res = await fetch('/api/config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.config)
             });
+            if (res.ok) {
+              const updated = await res.json();
+              if (!Array.isArray(updated.seriesExclusions)) updated.seriesExclusions = [];
+              if (!Array.isArray(updated.pathExclusions)) updated.pathExclusions = [];
+              this.config = Object.assign({}, this.config, updated);
+              this.savedConfigJson = JSON.stringify(this.config);
+              this.showToast('Configuration saved successfully!');
+            } else {
+              this.showToast('Failed to save configuration', false);
+            }
+          } catch (err) {
+            this.showToast('Error saving configuration: ' + err, false);
+          }
+        },
+
+        discardChanges() {
+          if (this.savedConfigJson) {
+            this.config = JSON.parse(this.savedConfigJson);
+            this.showToast('Changes discarded');
+          }
+        },
+
+        async resetConfig() {
+          if (!confirm('Are you sure you want to reset all settings to defaults?')) return;
+          try {
+            const res = await fetch('/api/config/reset', { method: 'POST' });
+            if (res.ok) {
+              const defaults = await res.json();
+              if (!Array.isArray(defaults.seriesExclusions)) defaults.seriesExclusions = [];
+              if (!Array.isArray(defaults.pathExclusions)) defaults.pathExclusions = [];
+              this.config = Object.assign({}, defaults);
+              this.savedConfigJson = JSON.stringify(this.config);
+              this.showToast('Configuration reset to default values');
+            } else {
+              this.showToast('Failed to reset configuration', false);
+            }
+          } catch (err) {
+            this.showToast('Error resetting configuration: ' + err, false);
+          }
+        },
+
+        addSeriesExclusion() {
+          const val = this.newSeriesExclusion.trim();
+          if (val && !this.config.seriesExclusions.includes(val)) {
+            this.config.seriesExclusions.push(val);
+            this.newSeriesExclusion = '';
+          }
+        },
+
+        removeSeriesExclusion(idx) {
+          this.config.seriesExclusions.splice(idx, 1);
+        },
+
+        addPathExclusion() {
+          const val = this.newPathExclusion.trim();
+          if (val && !this.config.pathExclusions.includes(val)) {
+            this.config.pathExclusions.push(val);
+            this.newPathExclusion = '';
+          }
+        },
+
+        removePathExclusion(idx) {
+          this.config.pathExclusions.splice(idx, 1);
+        },
+
+        async updateStatus() {
+          try {
+            const statusRes = await fetch('/api/status');
+            if (statusRes.ok) {
+              this.status = await statusRes.json();
+            }
+
+            const statsRes = await fetch('/api/stats');
+            if (statsRes.ok) {
+              this.stats = await statsRes.json();
+            }
+
+            const scanRes = await fetch('/api/scan/status');
+            if (scanRes.ok) {
+              this.scan = await scanRes.json();
+            }
+          } catch (err) {
+            this.status.status = 'Disconnected';
+          }
+        },
+
+        async startQuickScan() {
+          const path = this.quickScan.path.trim();
+          if (!path) {
+            alert('Please enter a directory or network share path.');
+            return;
+          }
+          try {
+            const res = await fetch('/api/scan', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ path, exportEdl: this.quickScan.exportEdl })
+            });
+            if (res.ok) {
+              this.showToast('Scan enqueued successfully!');
+              this.quickScan.path = '';
+              this.updateStatus();
+            } else {
+              this.showToast('Failed to start scan', false);
+            }
+          } catch (err) {
+            this.showToast('Error: ' + err, false);
+          }
+        },
+
+        async stopScan() {
+          if (!confirm('Are you sure you want to stop the active scan?')) return;
+          try {
+            const res = await fetch('/api/scan/stop', { method: 'POST' });
+            if (res.ok) {
+              this.showToast('Scan stopped');
+              this.updateStatus();
+            } else {
+              this.showToast('Failed to stop scan', false);
+            }
+          } catch (err) {
+            this.showToast('Error stopping scan: ' + err, false);
+          }
+        },
+
+        async loadSources() {
+          try {
+            const res = await fetch('/api/sources');
+            if (res.ok) {
+              this.sources = await res.json();
+            }
+          } catch (err) {
+            console.error('Failed to load sources:', err);
+          }
+        },
+
+        async syncKodiSources() {
+          this.syncingKodi = true;
+          try {
+            await this.loadSources();
+            this.showToast('Sources synced from Kodi');
+          } catch (e) {
+            this.showToast('Failed to sync sources: ' + e, false);
+          } finally {
+            this.syncingKodi = false;
+          }
+        },
+
+        async toggleSource(src) {
+          const newEnabled = !src.enabled;
+          const isTv = (src.contentType || 'tvshows').toLowerCase() === 'tvshows';
+
+          if (newEnabled && !isTv) {
+            this.confirmModal.source = src;
+            this.confirmModal.open = true;
             return;
           }
 
-          applyToggle();
-        });
-      });
+          await this.applySourceToggle(src, newEnabled);
+        },
 
-      container.querySelectorAll('.source-scan-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const path = btn.dataset.path;
-          const exportEdl = document.getElementById('quickScanEdl').checked;
+        async confirmEnableSource() {
+          const src = this.confirmModal.source;
+          this.confirmModal.open = false;
+          if (src) {
+            await this.applySourceToggle(src, true);
+          }
+        },
+
+        async applySourceToggle(src, enabled) {
+          const isTv = (src.contentType || 'tvshows').toLowerCase() === 'tvshows';
+          try {
+            const res = await fetch('/api/sources', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: src.name || '',
+                path: src.path,
+                enabled,
+                contentType: src.contentType || 'tvshows'
+              })
+            });
+            if (res.ok) {
+              if (enabled && !isTv) {
+                this.showToast(`Source enabled (Warning: Content is ${src.contentType || 'not TV Shows'})`, false);
+              } else {
+                this.showToast(`Source ${enabled ? 'enabled' : 'disabled'}`);
+              }
+              await this.loadSources();
+            } else {
+              this.showToast('Failed to update source', false);
+            }
+          } catch (e) {
+            this.showToast('Error: ' + e, false);
+          }
+        },
+
+        async scanSingleSource(path) {
+          const exportEdl = this.quickScan.exportEdl;
           try {
             const res = await fetch('/api/scan', {
               method: 'POST',
@@ -1904,110 +1736,82 @@ public static class DashboardPage
               body: JSON.stringify({ path, exportEdl })
             });
             if (res.ok) {
-              showToast('Scan enqueued for: ' + path);
-              updateStatus();
+              this.showToast('Scan enqueued for: ' + path);
+              this.updateStatus();
             } else {
-              showToast('Failed to start scan', false);
+              this.showToast('Failed to start scan', false);
             }
           } catch (e) {
-            showToast('Error: ' + e, false);
+            this.showToast('Error: ' + e, false);
           }
-        });
-      });
+        },
 
-      container.querySelectorAll('.source-del-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const path = btn.dataset.path;
-          if (!confirm('Remove scan source:\n' + path + '?')) return;
+        async scanAllSources() {
+          const enabled = this.sources.filter(s => s.enabled);
+          if (enabled.length === 0) {
+            alert('No scan sources are currently enabled.');
+            return;
+          }
+          const exportEdl = this.quickScan.exportEdl;
+          for (const src of enabled) {
+            try {
+              await fetch('/api/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: src.path, exportEdl })
+              });
+            } catch (e) {
+              console.error(e);
+            }
+          }
+          this.showToast(`Enqueued ${enabled.length} source(s) for scanning`);
+          this.updateStatus();
+        },
+
+        async removeSource(path) {
+          if (!confirm('Remove scan source:
+' + path + '?')) return;
           try {
             const res = await fetch('/api/sources?path=' + encodeURIComponent(path), { method: 'DELETE' });
             if (res.ok) {
-              showToast('Source removed');
-              loadSources();
+              this.showToast('Source removed');
+              await this.loadSources();
             } else {
-              showToast('Failed to remove source', false);
+              this.showToast('Failed to remove source', false);
             }
           } catch (e) {
-            showToast('Error: ' + e, false);
+            this.showToast('Error: ' + e, false);
           }
-        });
-      });
+        },
+
+        async addSource() {
+          const name = this.newSource.name.trim();
+          const path = this.newSource.path.trim();
+          const contentType = this.newSource.contentType || 'tvshows';
+          if (!path) {
+            alert('Please enter a source folder or network share path.');
+            return;
+          }
+          try {
+            const res = await fetch('/api/sources', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, path, enabled: true, contentType })
+            });
+            if (res.ok) {
+              this.showToast('Source added successfully');
+              this.newSource.name = '';
+              this.newSource.path = '';
+              await this.loadSources();
+            } else {
+              this.showToast('Failed to add source', false);
+            }
+          } catch (e) {
+            this.showToast('Error: ' + e, false);
+          }
+        }
+      };
     }
-
-    const syncKodiBtn = document.getElementById('syncKodiSourcesBtn');
-    if (syncKodiBtn) {
-      syncKodiBtn.addEventListener('click', async () => {
-        syncKodiBtn.disabled = true;
-        syncKodiBtn.textContent = '🔄 Syncing...';
-        try {
-          await loadSources();
-          showToast('Sources synced from Kodi');
-        } catch (e) {
-          showToast('Failed to sync sources: ' + e, false);
-        } finally {
-          syncKodiBtn.disabled = false;
-          syncKodiBtn.textContent = '🔄 Sync from Kodi';
-        }
-      });
-    }
-
-    document.getElementById('addSourceBtn').addEventListener('click', async () => {
-      const nameInp = document.getElementById('newSourceName');
-      const pathInp = document.getElementById('newSourcePath');
-      const typeInp = document.getElementById('newSourceContentType');
-      const name = nameInp.value.trim();
-      const path = pathInp.value.trim();
-      const contentType = typeInp ? typeInp.value : 'tvshows';
-      if (!path) {
-        alert('Please enter a source folder or network share path.');
-        return;
-      }
-      try {
-        const res = await fetch('/api/sources', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, path, enabled: true, contentType })
-        });
-        if (res.ok) {
-          showToast('Source added successfully');
-          nameInp.value = '';
-          pathInp.value = '';
-          loadSources();
-        } else {
-          showToast('Failed to add source', false);
-        }
-      } catch (e) {
-        showToast('Error: ' + e, false);
-      }
-    });
-
-    document.getElementById('scanAllSourcesBtn').addEventListener('click', async () => {
-      const enabled = currentSources.filter(s => s.enabled);
-      if (enabled.length === 0) {
-        alert('No scan sources are currently enabled.');
-        return;
-      }
-      const exportEdl = document.getElementById('quickScanEdl').checked;
-      for (const src of enabled) {
-        try {
-          await fetch('/api/scan', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: src.path, exportEdl })
-          });
-        } catch (e) {
-          console.error(e);
-        }
-      }
-      showToast(`Enqueued ${enabled.length} source(s) for scanning`);
-      updateStatus();
-    });
-
-    // Init
-    loadConfig();
-    loadSources();
-    updateStatus();
-    setInterval(updateStatus, 3000);
   </script>
 </body>
 </html>
