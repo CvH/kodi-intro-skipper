@@ -12,7 +12,6 @@
     </category>
 
     <category label="30040"> <!-- Scan Management -->
-        <setting label="30041" type="action" id="manage_sources_btn" action="RunScript(service.introskipper,manage_sources)"/>
         <setting label="30043" type="action" id="trigger_scan_btn" action="RunScript(service.introskipper,scan)"/>
         <setting label="30045" type="action" id="check_status_btn" action="RunScript(service.introskipper,status)"/>
         <setting label="30047" type="action" id="monitor_scan_btn" action="RunScript(service.introskipper,monitor)"/>
