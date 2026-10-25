@@ -66,13 +66,6 @@ msgctxt "#30040"
 msgid "Scan Management"
 msgstr "Scan-Verwaltung"
 
-msgctxt "#30041"
-msgid "Configure Sources to Scan..."
-msgstr "Quellen zum Scannen konfigurieren..."
-
-msgctxt "#30042"
-msgid "Select which video sources from sources.xml should be scanned for intros"
-msgstr "Auswählen, welche Quellen aus sources.xml nach Intros gescannt werden"
 
 msgctxt "#30043"
 msgid "Start Scan on Enabled Sources"

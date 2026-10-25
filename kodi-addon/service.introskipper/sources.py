@@ -54,66 +54,7 @@ def get_sources_xml_path():
     return candidates[0] if candidates else '/storage/.kodi/userdata/sources.xml'
 
 
-def get_config_file_path():
-    """
-    Path to scan_sources.json inside the addon's profile or config folder.
-    """
-    candidates = []
-    if ADDON:
-        try:
-            profile_dir = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
-            if profile_dir:
-                candidates.append(os.path.join(profile_dir, 'config', 'scan_sources.json'))
-                candidates.append(os.path.join(profile_dir, 'scan_sources.json'))
-        except Exception:
-            pass
 
-    base_dirs = [
-        '/storage/.kodi/userdata/addon_data/service.introskipper',
-        os.path.expanduser('~/.kodi/userdata/addon_data/service.introskipper'),
-    ]
-    for b in base_dirs:
-        candidates.append(os.path.join(b, 'config', 'scan_sources.json'))
-        candidates.append(os.path.join(b, 'scan_sources.json'))
-
-    for c in candidates:
-        if os.path.exists(c):
-            return c
-
-    target = candidates[0] if candidates else '/storage/.kodi/userdata/addon_data/service.introskipper/config/scan_sources.json'
-    target_dir = os.path.dirname(target)
-    if not os.path.exists(target_dir):
-        try:
-            os.makedirs(target_dir, exist_ok=True)
-        except Exception:
-            pass
-    return target
-
-
-def load_saved_states():
-    """
-    Loads saved {path: is_enabled} mapping. Defaults to empty (all disabled).
-    """
-    config_path = get_config_file_path()
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as ex:
-            log(f"Failed to load {config_path}: {ex}")
-    return {}
-
-
-def save_saved_states(states):
-    """
-    Saves {path: is_enabled} mapping to disk.
-    """
-    config_path = get_config_file_path()
-    try:
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(states, f, indent=2)
-    except Exception as ex:
-        log(f"Failed to save {config_path}: {ex}")
 
 
 def get_source_content_types():
@@ -169,7 +110,6 @@ def get_video_sources():
         log(f"sources.xml not found at {xml_path}")
         return sources
 
-    saved_states = load_saved_states()
     content_map = get_source_content_types()
 
     try:
@@ -182,28 +122,18 @@ def get_video_sources():
                 for path_elem in source.findall('path'):
                     path = (path_elem.text or '').strip()
                     if path:
-                        is_enabled = bool(saved_states.get(path, False))
                         norm = path.rstrip('/\\')
                         content_type = content_map.get(path, content_map.get(norm, 'unset'))
                         sources.append({
                             'name': name,
                             'path': path,
-                            'enabled': is_enabled,
+                            'enabled': False,
                             'contentType': content_type
                         })
     except Exception as ex:
         log(f"Error parsing sources.xml: {ex}")
 
     return sources
-
-
-def set_source_enabled(path, enabled):
-    """
-    Updates the enabled status for a specific path.
-    """
-    states = load_saved_states()
-    states[path] = enabled
-    save_saved_states(states)
 
 
 def sync_sources_with_server(server_url, timeout=3):
@@ -241,12 +171,6 @@ def sync_sources_with_server(server_url, timeout=3):
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 200:
                 server_sources = json.loads(resp.read().decode('utf-8'))
-                states = {}
-                for s in server_sources:
-                    p = s.get('path')
-                    if p:
-                        states[p] = bool(s.get('enabled', False))
-                save_saved_states(states)
                 log(f"Synchronized {len(server_sources)} sources with server.")
                 return server_sources
     except Exception as ex:
@@ -278,41 +202,6 @@ def fetch_server_sources(server_url, timeout=3):
     return get_video_sources()
 
 
-def push_sources_to_server(server_url, sources_list, timeout=3):
-    """
-    Pushes an explicit list of sources with their enabled statuses to the server.
-    """
-    if not server_url:
-        return False
-
-    server_url = server_url.rstrip('/')
-    payload = {
-        'sources': [
-            {
-                'name': s.get('name', ''),
-                'path': s.get('path', ''),
-                'enabled': bool(s.get('enabled', False)),
-                'contentType': s.get('contentType', 'tvshows')
-            }
-            for s in sources_list
-        ]
-    }
-
-    try:
-        import urllib.request
-        data = json.dumps(payload).encode('utf-8')
-        req = urllib.request.Request(
-            f"{server_url}/api/sources/sync",
-            data=data,
-            headers={'Content-Type': 'application/json', 'User-Agent': 'Kodi-IntroSkipper/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status == 200
-    except Exception as ex:
-        log(f"Failed to push sources to server: {ex}", xbmc.LOGWARNING if xbmc else None)
-        return False
-
-
 def get_enabled_paths(server_url=None):
     """
     Returns all media source paths that are currently enabled for scanning.
@@ -325,6 +214,5 @@ def get_enabled_paths(server_url=None):
         except Exception:
             pass
 
-    sources_list = get_video_sources()
-    return [s['path'] for s in sources_list if s.get('enabled', False)]
+    return []
 

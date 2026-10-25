@@ -190,7 +190,7 @@ def show_status():
     idx = status.get('fileIndex', 0)
     tot = status.get('totalFiles', 0)
 
-    enabled_paths = sources.get_enabled_paths()
+    enabled_paths = sources.get_enabled_paths(get_server_url())
     sources_summary = f"{len(enabled_paths)} enabled" if enabled_paths else "None (default: all disabled)"
 
     scan_info = ""
@@ -231,76 +231,6 @@ def show_status():
 
 
 
-def manage_sources():
-    server_url = get_server_url()
-    all_sources = sources.sync_sources_with_server(server_url)
-    if not all_sources:
-        all_sources = sources.get_video_sources()
-
-    if not all_sources:
-        if xbmcgui:
-            xbmcgui.Dialog().ok(
-                ADDON_NAME,
-                "No media sources found in Kodi's sources.xml or IntroSkipper server.\n\nPlease add your media folders under Settings -> Media -> Videos or via the IntroSkipper web interface."
-            )
-        else:
-            print("No media sources found.")
-        return
-
-    if not xbmcgui:
-        print(f"=== Scan Sources ({len(all_sources)} sources) ===")
-        for s in all_sources:
-            status_mark = "[X]" if s.get('enabled') else "[ ]"
-            print(f" {status_mark} {s.get('name', 'Media')} ({s.get('path', '')})")
-        return
-
-    labels = []
-    preselect = []
-    for i, s in enumerate(all_sources):
-        c_type = s.get('contentType', 'tvshows')
-        is_tv = str(c_type).lower() == 'tvshows'
-        prefix = "" if is_tv else f"⚠️ [{c_type}] "
-        labels.append(f"{prefix}{s.get('name', 'Media')}  ({s.get('path', '')})")
-        if s.get('enabled'):
-            preselect.append(i)
-
-    dialog = xbmcgui.Dialog()
-    selected_indices = dialog.multiselect(
-        f"Select Sources to Scan ({len(preselect)}/{len(all_sources)} enabled)",
-        labels,
-        preselect=preselect
-    )
-
-    if selected_indices is None:
-        # User cancelled
-        return
-
-    states = {}
-    updated_sources = []
-    enabled_count = 0
-    for i, s in enumerate(all_sources):
-        is_active = i in selected_indices
-        p = s.get('path', '')
-        states[p] = is_active
-        updated_sources.append({
-            'name': s.get('name', ''),
-            'path': p,
-            'enabled': is_active,
-            'contentType': s.get('contentType', 'tvshows')
-        })
-        if is_active:
-            enabled_count += 1
-
-    sources.save_saved_states(states)
-    sources.push_sources_to_server(server_url, updated_sources)
-    dialog.notification(
-        ADDON_NAME,
-        f"Saved: {enabled_count} of {len(all_sources)} sources enabled (synced to server)",
-        xbmcgui.NOTIFICATION_INFO,
-        3000
-    )
-
-
 def get_server_path_prefixes():
     try:
         server_url = get_server_url()
@@ -325,14 +255,12 @@ def trigger_scan():
     enabled_paths = sources.get_enabled_paths(get_server_url())
     if not enabled_paths:
         if xbmcgui:
-            dialog = xbmcgui.Dialog()
-            if dialog.yesno(
+            xbmcgui.Dialog().ok(
                 ADDON_NAME,
-                "No scan sources are currently enabled.\n\nWould you like to configure scan sources from sources.xml now?"
-            ):
-                manage_sources()
+                "No scan sources are currently enabled.\n\nPlease configure and enable media sources via the IntroSkipper web interface."
+            )
         else:
-            print("No scan sources are currently enabled. Configure scan sources first.")
+            print("No scan sources are currently enabled. Configure scan sources via the IntroSkipper web interface.")
         return
 
     if xbmcgui:
@@ -463,10 +391,7 @@ def live_monitor():
 def main():
     arg = sys.argv[1].lower() if len(sys.argv) > 1 else ""
 
-    if arg == "manage_sources":
-        manage_sources()
-        return
-    elif arg == "status":
+    if arg == "status":
         show_status()
         return
     elif arg == "scan":
@@ -488,8 +413,8 @@ def main():
     queued_label = f" ({status.get('queuedJobs', 0)} queued)" if status and status.get('queuedJobs', 0) > 0 else ""
     is_scanning = status.get('isScanning', False) if status else False
 
-    enabled_count = len(sources.get_enabled_paths())
-    all_sources = sources.get_video_sources()
+    server_url = get_server_url()
+    enabled_count = len(sources.get_enabled_paths(server_url))
 
     options = [
         f"1. Current Status: [{st_label}{queued_label}]",
@@ -503,10 +428,6 @@ def main():
         options.append("3. Stop Active Scan")
         action_map[next_idx] = "stop"
         next_idx += 1
-
-    options.append(f"{next_idx + 1}. Configure Scan Sources ({enabled_count}/{len(all_sources)} enabled)...")
-    action_map[next_idx] = "sources"
-    next_idx += 1
 
     options.append(f"{next_idx + 1}. Live Scan Monitor")
     action_map[next_idx] = "monitor"
@@ -529,8 +450,6 @@ def main():
         elif action == "stop":
             if xbmcgui.Dialog().yesno(ADDON_NAME, "Are you sure you want to stop the active scan?"):
                 stop_scan()
-        elif action == "sources":
-            manage_sources()
         elif action == "monitor":
             live_monitor()
         elif action == "stats":
