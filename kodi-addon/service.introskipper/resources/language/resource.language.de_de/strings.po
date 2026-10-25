@@ -50,10 +50,6 @@ msgctxt "#30014"
 msgid "Disabled"
 msgstr "Deaktiviert"
 
-msgctxt "#30015"
-msgid "Prompt Duration (seconds)"
-msgstr "Anzeigedauer des Buttons (Sekunden)"
-
 msgctxt "#30020"
 msgid "Credits Action"
 msgstr "Abspann-Aktion"

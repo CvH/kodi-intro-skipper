@@ -7,23 +7,12 @@ import os
 import xml.etree.ElementTree as ET
 try:
     import xbmc
-    import xbmcaddon
     import xbmcgui
     import xbmcvfs
 except ImportError:
     xbmc = None
-    xbmcaddon = None
     xbmcgui = None
     xbmcvfs = None
-
-ADDON_ID = 'service.introskipper'
-if xbmcaddon:
-    try:
-        ADDON = xbmcaddon.Addon(ADDON_ID)
-    except Exception:
-        ADDON = None
-else:
-    ADDON = None
 
 
 def log(msg, level=None):
@@ -54,9 +43,6 @@ def get_sources_xml_path():
         if path and os.path.exists(path):
             return path
     return candidates[0] if candidates else '/storage/.kodi/userdata/sources.xml'
-
-
-
 
 
 def get_source_content_types():

@@ -3,8 +3,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
 import json
-import sys
-import urllib.parse
 import urllib.request
 try:
     import xbmc
